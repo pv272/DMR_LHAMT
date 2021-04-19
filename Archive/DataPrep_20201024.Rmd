@@ -1,0 +1,1344 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+The aim of this document is to prepare the data and outline the available sample size of the LHAMT Project
+
+```{r package, include=FALSE}
+
+rm(list=ls())
+
+library(tidyverse)
+library(RMySQL)
+library(lubridate)
+library(rvg)
+library(officer)
+library(gridExtra)
+
+```
+
+
+
+```{r DB connect, include=FALSE}
+#connect to DB, local = 1 if at project or local = 0 if AMS server  
+con<-db_connect(username = 'philippev',local=0)
+
+```
+
+
+## Load Data 
+
+###CSV
+
+```{r CSV}
+
+
+#Get euthanized animals
+LHAMT_Brain <- con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.Brain") %>% 
+  mutate(SacrificeDate = ymd(SacrificeDate)) %>% 
+  filter(BranUse == "RNAseq" | BranUse == "") %>% #L2M008 had empty brain use on brain table 
+  mutate(BreedingStatus = case_when(AnimalID == "Z3M006" ~ "Breeder", #Correction as wa labelled as unknown
+                                    TRUE ~ BreedingStatus)) %>% 
+  distinct()#to remove duplicated of L2M008
+View(LHAMT_Brain)
+#We have brain for RNAseq from 79 individuals
+#This include animals that should actually be dismissed from the dataset, at which point should they be discarded?
+
+
+#get punches
+LHAMT_Punched <- read.csv("Punches_SampleID_20200323.csv") %>% 
+  mutate(AnimalID = as.character(AnimalID)) %>%
+   mutate(AnimalID = case_when(AnimalID == "N0F009" ~ "NOF009",
+                              AnimalID == "N0M003" ~ "NOM003",
+                              AnimalID == "N0F007" ~ "NOF007",
+                              AnimalID == "N0M004" ~ "NOM004",
+                              AnimalID == "T1F003" ~ "TIF003",
+                              AnimalID == "T1F005" ~ "TIF005",
+                              AnimalID == "T1F008" ~ "TIF008",
+                              TRUE ~ AnimalID))
+
+
+#Get sequenced punches
+LHAMT_Sequenced <- read.csv("LHAMT_SamplesSequenced.csv") %>% 
+  rename(PunchID = SampleID) %>% 
+  mutate(AnimalID = as.character(AnimalID)) %>% 
+  mutate(AnimalID = case_when(AnimalID == "N0F009" ~ "NOF009",
+                              AnimalID == "N0M003" ~ "NOM003",
+                              AnimalID == "N0F007" ~ "NOF007",
+                              AnimalID == "N0M004" ~ "NOM004",
+                              AnimalID == "T1F003" ~ "TIF003",
+                              AnimalID == "T1F005" ~ "TIF005",
+                              AnimalID == "T1F008" ~ "TIF008",
+                              TRUE ~ AnimalID))#a few animals names were changed in the file received from Hans
+View(LHAMT_Sequenced)
+
+View(LHAMT_Sequenced %>% 
+  filter(grepl("GR",AnimalID)) %>% 
+    arrange(PunchID))
+
+```
+
+
+##Data Preparation
+
+The LHAMT project is made of some (not all) experimental subjects originating from the LHAM experiment and non-experimental individuals. I first generate general info for all animals that were part of the LHAMT, then information specific to the LHAM animals (not all of which were euthanized for LHAMT), then bind the general and LHAM specific infor for animals that were part of LHAMT
+
+
+###General Animal Info
+
+We start by querying general information relevant to both LHAM subjects and non-experimental individuals euthanized within the frame of the LHAMT
+
+```{r LHAM-LHAMT AnimalID info}
+
+#LHAM Subjects
+LHAM_SubjectID <- Experiments_SubjectID %>% 
+  filter(ExpName =="LHAM") %>% 
+  distinct() %>% #to remove duplicationn of BEM021
+  filter(!(AnimalID %in% c("GMM001","CAM002","G10F026","G3M020","VIF018")))#G3M020 was paired with G10F024 originally from Seregenti to form Addo, G10F026 was paired with G3M014 originally from Serengeti to form Who
+View(LHAM_SubjectID)
+
+
+#Euthanized non-experimental individual
+LHAMT_NonExp_AnimalID <- LHAMT_Brain %>% 
+  distinct(AnimalID) %>% 
+  anti_join(.,LHAM_SubjectID) %>% 
+  mutate(ExpName = NA)
+View(LHAMT_NonExp_AnimalID)
+#27 non-experimental animals among the 79 euthanized animals of LHAM Tissue
+
+
+#LHAMT
+LHAMT_AnimalID <- LHAMT_Brain %>% 
+  distinct(AnimalID) %>% 
+  mutate(LHAMT_Euthanized = "Yes")
+View(LHAMT_AnimalID)
+#79 euthanized animals
+  
+
+#LHAM and LHAMT non-experimental subjects 
+LHAM_LHAMT_AnimalID <- bind_rows(LHAM_SubjectID,LHAMT_NonExp_AnimalID) %>% 
+  left_join(.,LHAMT_AnimalID) %>% 
+  mutate(LHAMT_Euthanized = replace_na(LHAMT_Euthanized, "No"))
+View(LHAM_LHAMT_AnimalID)#
+#102 individuals
+
+
+#get individual characteristics
+LHAM_LHAMT_AnimalInfo <- idinfo_static(LHAM_LHAMT_AnimalID %>% 
+                                         select(AnimalID)) %>% 
+  left_join(.,LHAM_LHAMT_AnimalID) %>% 
+  relocate(ExpName:LHAMT_Euthanized,.after=AnimalID) %>% 
+  left_join(.,Litter_Info %>% 
+              filter(IndividualConceptionCount_Total == 1) %>% 
+              select(AnimalID,PairingColony,ConceptionDate,ConceptionColony,ParturitionDate,ParturitionColony) %>% 
+              rename(FirstLitter_PairingColony = PairingColony,
+                     FirstLitter_ConceptionDate = ConceptionDate ,
+                     FirstLitter_ConceptionColony = ConceptionColony,
+                     FirstLitter_ParturitionDate = ParturitionDate,
+                     FirstLitter_ParturitionColony = ParturitionColony))
+View(LHAM_LHAMT_AnimalInfo)
+
+```
+
+
+###LHAM info 
+
+Information that are specific to animals that were part of the LHAM experiments
+
+The code has been taken from NPAC/HormoneAnalyses/NPAC/PreExtraction/HormoneAnalyses_SampleSelection/SampleSelection_BreedingOpportunity. Instead of running the code, I could also just use a csv. 
+
+```{r General Info}
+
+#General info on LHAM animals
+LHAM_SubjectID_Info <- LHAM_LHAMT_AnimalInfo %>% 
+  filter(ExpName == "LHAM")
+
+#get Experimental group by querying GroupMembership 2 week after experiment start
+#Could be an issue if animal died within 2 weeks of animal start
+LHAM_ExperimentalColony <- membership(LHAM_SubjectID %>% 
+  mutate(Date = ExperimentStartDate + 14) %>% #I put 14 cause Dave had a few experiment start wrong
+  select(AnimalID,Date), MembershipBetweenV2) %>% 
+  select(-ColonyLocation) %>% 
+  rename(ExperimentalGroup = Colony)
+View(LHAM_ExperimentalColony)
+#Date must be kept or else treatment cannot be queried
+
+
+#get the group size one week after experiment start 
+# this will be useful to assign treatment (solitary animals)
+LHAM_ColonySize <- groupcomp(LHAM_ExperimentalColony %>% 
+                                select(ExperimentalGroup,Date) %>% 
+                                rename(Colony = ExperimentalGroup), MembershipBetweenV2) %>% 
+  #GROUP BY COLONY, DATE
+  group_by(Colony,Date) %>% 
+  mutate(GroupSize_W1 = n()) %>% #also returns a row for 
+  ungroup() %>% 
+  #UNGROUP
+  rename(ExperimentalGroup = Colony)
+View(LHAM_ColonySize)
+
+
+#Get Colony in which animal started the experiment
+LHAM_StartColony <- membership(LHAM_SubjectID_Info %>%
+                                  select(AnimalID,BirthDate) %>% 
+                                   rename(Date = BirthDate) %>% 
+                                   mutate(Date = Date + 20),#this is to avoid CF animals returning the colony of birth
+                                 MembershipBetweenV2) %>% 
+  select(AnimalID,Colony) %>% 
+  rename(StartGroup = Colony)
+View(LHAM_StartColony)
+
+
+#Query Treatment
+#Based on whether animal changed group or not AND the size of the new group they were part of (group size of 1 in case of solitary)
+LHAM_SubjectID_Treatment <- LHAM_SubjectID %>%
+  left_join(.,LHAM_StartColony) %>%
+  left_join(.,LHAM_ExperimentalColony %>% select(-Date)) %>% 
+  inner_join(.,LHAM_ColonySize %>% 
+                mutate(Date = Date-14) %>% 
+                select(-ExperimentalGroup), by=c("AnimalID" = "AnimalID", "ExperimentStartDate" = "Date")) %>% 
+   mutate(Treatment = case_when(GroupSize_W1 == 1 ~ "Solitary",
+                                GroupSize_W1 != 1 & ExperimentalGroup != StartGroup ~ "Breeder", #Exclude CF helper that like breeder have changed groups
+                                 TRUE ~ "Helper")) %>% #add Treatment
+  select(AnimalID,Treatment)
+View(LHAM_SubjectID_Treatment)
+
+
+#generate an Experimental Unit
+#I do not know how to do that in one go in a pipe, cur_group_id() indexes without starting at 0 for when changing groups
+#ask Colin
+LHAM_ExperimentalUnit <- LHAM_SubjectID_Treatment %>%
+  left_join(.,LHAM_SubjectID) %>% 
+  left_join(.,LHAM_SubjectID_Info %>% 
+              select(AnimalID,Sex,LitterRef)) %>% 
+  arrange(ExpName,Sex,ExperimentStartDate) %>% #to have the experimentalunit referring the sequence in which animals were done
+  distinct(ExpName,Sex,ExpName,LitterRef) %>%
+  #GROUP BY EXPNAME, SEX
+  group_by(ExpName,Sex) %>% 
+  mutate(ExperimentalUnit = row_number()) %>% #this generates an ExperimentUnit, I would not know how to do that without a distinct that reduces to one row per litter. 
+  ungroup() %>% 
+  #UNGROUP()
+  select(ExpName,Sex,LitterRef,ExperimentalUnit)
+View(LHAM_ExperimentalUnit)
+
+
+###########################################Combine all information
+LHAM_Info <- LHAM_SubjectID %>%
+  left_join(.,LHAM_SubjectID_Info %>% 
+              select(AnimalID,Sex,LitterRef,BirthDate,DeathDate)) %>% 
+  left_join(.,LHAM_StartColony) %>% 
+  left_join(.,LHAM_ExperimentalColony) %>%
+  left_join(.,LHAM_ExperimentalUnit) %>%
+  left_join(.,LHAM_SubjectID_Treatment) %>% 
+  mutate(ExperimentalSeries = case_when(ExpName == "LHAM" & ExperimentStartDate > "2017-10-01"  ~ 2, 
+                                        TRUE ~ 1)) %>% #add an experimental serie for LHAM as it may explain difference in sampling
+  mutate(ExperimentStartAge = (ExperimentStartDate - BirthDate)/30.4375) %>% #age at which animal started the experiment
+  mutate(Experiment_Duration = (DeathDate - ExperimentStartDate)/ 30.4375) %>% 
+  #mutate(Experiment_Duration = as.double(difftime(DeathDate,ExperimentStart,units = "weeks"))) %>% 
+  arrange(ExpName,Sex,ExperimentStartDate) %>% 
+  select(-Date)
+View(LHAM_Info)
+#75 entries 
+
+```
+
+
+Pairing and Parturition data. Unsure yet they will be useful here 
+```{r Pairing and Parturition}
+
+#get the pairing date and group associated with experiment
+#animals may have been paired 2x
+#Not all of these pairing led to conception
+LHAM_Pairing <- LHAM_Info %>% 
+  left_join(.,tblPairing %>% 
+              rename(PairingColony = Colony)) %>%
+  #GROUP BY AnimalID
+  group_by(AnimalID) %>% 
+  mutate(IndividualPairing_NB = row_number(),
+         NextPairingDate = lead(PairingDate)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  mutate(PairingExperimentStart_DayDiff = PairingDate - ExperimentStartDate) %>% 
+  filter(Treatment == "Breeder") %>%  # note that one control animal paired from Lorenz was paired to form virgin Island
+  select(AnimalID,IndividualPairing_NB,PairingDate,NextPairingDate)
+View(LHAM_Pairing)
+#41 rows
+
+
+#LHAM subjects paired more than once
+LHAM_RepeatedPairing <- LHAM_Pairing %>%
+  filter(IndividualPairing_NB > 1)  
+View(LHAM_RepeatedPairing)
+#Some animals were paired more than once within frame of experiments
+
+
+#litter produced as a result of each pairing LHAMBS pairing
+#Keep in min dthat all pairing did not produced a litter (death of partner)
+LHAM_ParturitionDate <- LHAM_Info %>% 
+  filter(Treatment == "Breeder") %>% #to avoid getting litters produced by animal from helper treatment later in their life
+  left_join(LHAM_Pairing) %>% 
+  select(AnimalID,Sex,ExpName,ExperimentalUnit,PairingDate,NextPairingDate) %>% 
+  left_join(Litter_Info %>% 
+              select(AnimalID, PairingDate, PairingColony, IndividualConceptionCount_Total,ParturitionDate,ParturitionColony)) %>% #add litters produced by the pairing
+  mutate(ParturitionPairing_DayDiff = ParturitionDate - PairingDate)
+View(LHAM_ParturitionDate)
+#NA indicate that the pairing did not lead to a parturition (which doesn't mean that the animal may not have conceived, but this info will remain unknown)
+
+
+View(LHAM_ParturitionDate %>% 
+       group_by(AnimalID) %>% 
+       mutate(ParturitionColonyCount = n_distinct(ParturitionColony)) %>% 
+       ungroup() %>% 
+       filter(ParturitionColonyCount>1))
+#DAM002 produced litters in Okavango and Gombe; pairing in Gombe missing from tblPairing posted in Gitlab
+
+
+#Get First parturition of a pairing
+#Pay attention it is not the first pairing ever but only tell us whether a pairing has been succesful
+LHAM_Pairing_FirstParturitionDate <- LHAM_ParturitionDate %>% 
+  #GROUP BY AnimalID
+  group_by(AnimalID,PairingDate) %>% 
+  filter(ParturitionPairing_DayDiff == min(ParturitionPairing_DayDiff) | is.na(ParturitionPairing_DayDiff)) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  mutate(SuccesfullPairing = case_when(is.na(ParturitionDate) ~ "No",
+                                       TRUE ~ "Yes") ) %>% 
+  select(AnimalID,PairingDate,SuccesfullPairing) %>% 
+  distinct() 
+View(LHAM_Pairing_FirstParturitionDate)
+
+
+#Get First parturition date ever for each individual
+LHAM_FirstParturitionDate <- LHAM_ParturitionDate %>% 
+  filter(IndividualConceptionCount_Total == 1) %>% 
+  select(AnimalID,ParturitionDate) %>% 
+  rename(FirstParturitionDate = ParturitionDate)
+View(LHAMBS_FirstParturitionDate)
+  
+
+View(anti_join(LHAM_Pairing,LHAM_Pairing_FirstParturitionDate,by=c("AnimalID","PairingDate")))
+#No mismatch LHAMBS Pairing and parturion when left join on AnimalID and paring date
+```
+
+
+```{r All Info}
+LHAM_Info_ForSelection <- LHAM_Info %>% 
+  left_join(.,LHAM_Pairing) %>% 
+  left_join(.,LHAM_Pairing_FirstParturitionDate) %>% 
+  left_join(.,LHAM_FirstParturitionDate)
+View(LHAM_Info_ForSelection)
+#83 entries  
+```
+
+
+###LHAMT and LHAM info
+
+```{r LHAM-LHAMT individual info}
+
+LHAMT_AnimalInfo_All <- LHAMT_AnimalID %>%
+  left_join(.,LHAM_LHAMT_AnimalInfo) %>% 
+  left_join(.,LHAM_Info) %>% 
+  left_join(.,LHAMT_Brain %>% select(AnimalID,Training,BreedingStatus)) %>% 
+  left_join(.,LHAMT_Punched %>% 
+              distinct(AnimalID) %>% 
+              mutate(Punched = "Yes")) %>% 
+  left_join(.,LHAMT_Sequenced %>% 
+              distinct(AnimalID) %>% 
+              mutate(Sequenced = "Yes")) %>% 
+  mutate(DevelopingColony = case_when(AnimalID %in% c("L2F010","L2F009") ~ "Lonely 2",
+                                      AnimalID == "Z3F022" ~ "Z3T003",
+                                      TRUE ~ DevelopingColony)) %>% 
+  mutate(BreedingStatus = case_when(DeathAge < 100 ~ "Pup",
+                                    TRUE ~ BreedingStatus)) %>% #to change the breedingStatus of the 4 pups to pups to generate correct samples size
+  mutate(Queried_BreedingStatus = case_when(!(is.na(FirstLitter_ConceptionDate)) ~ "Breeder",
+                                              AnimalID == "Z3F022" ~ "Solitary", # non-experimental animal that was solitary
+                                              BreedingStatus == "King"|BreedingStatus =="Queen" ~ "Breeder",
+                                              TRUE ~ BreedingStatus)) %>% 
+  mutate(ExperimentStartDate = as.character(ExperimentStartDate)) %>%
+  mutate(ExperimentStartDate = case_when(AnimalID == "G3M020" ~ "2017-06-18",
+                                      AnimalID == "G10F026" ~ "2017-06-18",
+                                      TRUE ~ ExperimentStartDate)) %>% #assign a fake experiment start to non-experimental breeders; start date being the date of pairing
+  mutate(ExperimentStartDate = ymd(ExperimentStartDate)) %>% 
+  relocate(StartGroup:Experiment_Duration,.after = ExperimentStartDate) %>% 
+  arrange(Sex,DevelopingColony,LitterRef,Treatment)
+View(LHAMT_AnimalInfo_All)
+
+
+#write a csv that can be used in other files for analyses 
+write.csv(LHAMT_AnimalInfo_All,"LHAMT_AnimalInfo_All.csv")
+
+
+#Duration of experiment of animals part of LHAMT
+summary(as.numeric(LHAMT_AnimalInfo_All$Experiment_Duration))
+#the maximum duration of the experiment was 25 months 
+
+
+#Min age at which an animal started the experiment
+summary(as.numeric(LHAMT_AnimalInfo_All$ExperimentStartAge))
+#the maximum duration of the experiment was 13.5 months 
+```
+
+
+##Behaviours
+
+The merging of old and new data should be done in the Data_Import&Prep R file. I also should check with Tim Vink how far he has gone with the merging of the behaviour
+
+```  {r Scan}
+
+#Get Scan Session Old import 
+Scan_SessionDetails_Old <- 
+   con %>%
+  dbGetQuery ("SELECT ScanRef,
+tblColonyCodes.Colony,
+DATE(StartDate) AS ObsDate,
+TotalScanNumber
+FROM Moleratdatabase.tblScanSessionDetails
+LEFT JOIN Moleratdatabase.tblColonyCodes ON Moleratdatabase.tblScanSessionDetails.ColonyRef = tblColonyCodes.ColonyRef") %>% 
+  mutate(ObsDate = ymd(ObsDate))
+View(Scan_SessionDetails_Old)
+
+
+#Get Scan Behaviour Instantaneous Old
+#To get all Scan Ref the animals were part of
+Scan_InstBehav_Old <- con %>%
+  dbGetQuery ("SELECT * FROM Moleratdatabase.tblScanBehaviour") %>% 
+  distinct(ScanRef,AnimalID)
+View(Scan_InstBehav_Old)
+
+
+#All individual scan dates old import
+IndividualScanDate_Old_All <- Scan_InstBehav_Old %>% 
+  left_join(.,Scan_SessionDetails_Old %>% select(ScanRef,ObsDate)) %>% 
+  distinct(AnimalID,ObsDate)#I could also get group from here
+
+View(IndividualScanDate_Old_All)
+
+
+#Get Scan Session New import 
+Scan_SessionDetails_New <- con %>%
+  dbGetQuery ("SELECT * FROM MR_RawData.qryScanFileSession") %>% 
+  rename(ObsDate = ObservationDate) %>% 
+  mutate(ObsDate = ymd(ObsDate)) %>% 
+  rename(ScanRef = ScanFileID)
+View(Scan_SessionDetails_New)
+
+
+#Get Scan Behaviour Instantaneous New
+#Don't rerun this code it takes forever
+#I cannot get colony from here, I would have to reun membership()
+Scan_InstBehav_New <- con %>%
+  dbGetQuery ("SELECT * FROM MR_RawData.qryScanInstantaneous") %>% 
+  distinct(Subject,ScanFileID) 
+
+Scan_InstBehav_New_II <- Scan_InstBehav_New %>% 
+  rename(AnimalID = Subject, ScanRef = ScanFileID)
+View(Scan_InstBehav_New_II)
+
+
+#All individual scan dates New import
+IndividualScanDate_New_All <- Scan_InstBehav_New_II %>% 
+  left_join(.,Scan_SessionDetails_New %>% select(ScanRef,ObsDate)) %>% 
+  distinct(AnimalID,ObsDate)
+View(IndividualScanDate_New_All)
+
+
+#Get all dates of scan observation (Old and new import)
+#It really would be best to have the group. Thus modify the codes above
+IndividualScanDate_OldNew_All <- bind_rows(IndividualScanDate_Old_All ,IndividualScanDate_New_All)
+View(IndividualScanDate_OldNew_All)
+
+```
+
+
+##Sample size and data check
+
+79 animals were euthanized (females: 20 non-breeders, 8 solitary, 13 breeders; males:16 non-breeders, 18 breeders, 4 pups), including 52 subjects which were part of an experiment in which the breeding status of same-sex litter mate was experimentally controlled. In 19 cases, euthanization was not a priori planned in the generation of the data set but for health reasons and or training purposes. 
+
+
+ARF013 (Helper from Aristotle): taken out for blood and found to be paralyzed from hips down
+Not sequenced
+
+BEF001 (Helper from Bennett): had a calcified growth on lower right jaw. Had been monitored for a month before was decided to euthanize. Have a look at weight profile to assess whether could be used or not.
+Has been sequenced
+
+G4F022 (Helper from G4): Was an experimental LHAM animal but was found in Curie, I believe on the morning it was supposed to be sacrificed. One would need to assess for how long the animal had been left in Curie
+Not sequenced
+
+G13M006 (Breeder from G13): euthanized for health reasons. According to the vet due to a liver disease causing water retention in abdomen
+Not sequenced
+
+Z3M006 (Breeder from Z3): Was hit by a pipe during cleaning. Dead or near dead by the time it was euthanized
+Not sequenced
+
+Z3M025 (Helper from Z3): found sick with diarhea at 11 a.m. put in box and euthanized at 1 p.m. Animal almost if not dead by the time of euthanasia. 
+Not sequenced
+
+Z4M001 (Breeder from Bshary): Animal found dying (as good as dead) in colony. Head taken for brain sampling. Necropsy done by IG: discolored kidney, small pancreas, dark gall bladder, white spots on spleen, thinning of wall of intestine, large intestine yellowish
+Not sequenced
+
+
+Micropunches were collected from the brain of 54 individuals (females: 15 non-breeders, 8 solitary, 11 breeders; males:10 non-breeders, 10 breeders). One entire euthanized experimental unit (CUM002, CUM003) and two partial experimental unit were not punched. Among the animals from whom micropunches were collected, 
+
+i) 4 brains were meant to be used for training purposes (L2F009 and L2F010 from L2T002, Z3F022 from Z3T003, and BEF001 from Bennett). 
+
+ii) 3 brains were assigned to breeders that had never produced a litter. LAF007 and TSM038 from Bontebok and RAM001 from Karoo (the female was not euthanized)
+
+
+All individuals from which micropunches were collected had at least one sample being sequenced. Analyses should be re-run after the exclusion of samples that were collected for training purposes (see above). Z3F022 should be considered as a solitary female (has been changed in the code above) and whether LAF007 and TSM038 (Bontebok), and RAM001 who were all labelled as breeders had conceived should be verified. 
+
+Micropunches that were sequenced should be highlighted on the pictures of brain slices to assess whether exclusion from the dataset or better alternatives should be considered. 
+
+```{r Punches-Sequencing data check}
+
+########################################Euthanized animals
+
+#Sample size
+table(LHAMT_AnimalInfo_All$Sex, LHAMT_AnimalInfo_All$Queried_BreedingStatus)
+#20 NB females
+#8 Solitary female
+#13 Breeding female 
+
+#16 NB males
+#18 B males (Z3m006 classified as unknown but is a breeder)
+#4 pups
+
+
+#Euthanized animals that are experimental
+View(LHAMT_AnimalInfo_All %>%
+       filter(ExpName == "LHAM"))
+
+
+#Helpers that bred?
+View(LHAMT_AnimalInfo_All %>% 
+       filter(BreedingStatus == "Helper") %>% 
+       filter(!(is.na(FirstLitter_ConceptionDate))))
+#No helper that were assigned the status of helper ever gave birth
+  
+
+#Breeders that never bred?
+View(LHAMT_AnimalInfo_All %>% 
+       filter(BreedingStatus %in% c("King","Queen")) %>% 
+       filter(is.na(FirstLitter_ConceptionDate)))
+#Bontebok pair (LAF007, TSM038) never gave birth in the lab but I would need to check with Rachel that the queen was pregnant at the time of sacrifice
+#RAM001 the king from Karoo may never have conceived. He had been paired with ARF001 on 30th October 2017 who died on the 30th March 2018. ARF014 was then added into Karoo on the 19 September 2018 and RAM001 euthanized 8 days later on the 27th September 2018. 
+#We should have a look at whether ARF001 and ARF014 ever gave evidence of pregnancy. If not the male could be excluded from analyses
+
+
+
+########################################Punches
+#Sample size of punched animals
+Punched_Subset <- LHAMT_AnimalInfo_All %>% 
+  filter(Punched == "Yes")
+View(Punched_Subset)
+#54 distinct animals out of the 79 individuals that were euthanized were punched
+
+#Sample size
+table(Punched_Subset$Sex, Punched_Subset$Queried_BreedingStatus)
+
+
+#sample zie of punched experimental animal
+Punched_Experimental <- Punched_Subset %>% 
+  filter(ExpName == "LHAM")
+table(Punched_Experimental$Sex, Punched_Experimental$Queried_BreedingStatus)
+
+
+#Table of experimental animals 
+Female_Dataset_Table <- Punched_Subset %>% 
+  filter(Sex == "F") %>% 
+  select(AnimalID, Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>%
+  #GROUP BY 
+  group_by(Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = Queried_BreedingStatus, values_from = Count) %>% 
+  rename(StartColony = DevelopingColony) %>% 
+  arrange(Sex,StartColony, ExperimentalUnit) %>% 
+  replace_na(list(Breeder = 0, Helper = 0, Solitary = 0, ExperimentalUnit = "Non-Experimental"))
+View(Female_Dataset_Table)
+
+write.csv(Female_Dataset_Table,"Female_Dataset_Table.csv",row.names = FALSE)
+
+
+Male_Dataset_Table <- Punched_Subset %>% 
+  filter(Sex == "M") %>% 
+  select(AnimalID, Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>%
+  #GROUP BY 
+  group_by(Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = Queried_BreedingStatus, values_from = Count) %>% 
+  rename(StartColony = DevelopingColony) %>% 
+  arrange(Sex,StartColony, ExperimentalUnit) %>% 
+  replace_na(list(Breeder = 0, Helper = 0, Solitary = 0, ExperimentalUnit = "Non-Experimental"))
+View(Male_Dataset_Table)
+
+write.csv(Male_Dataset_Table,"Male_Dataset_Table.csv",row.names = FALSE)
+
+
+#Euthanized animals not punched
+LHAMT_NotPunched <- LHAMT_AnimalInfo_All %>% 
+  filter(is.na(Punched)) %>% 
+  arrange(AnimalID)
+View(LHAMT_NotPunched)
+#25 animals were not punched
+
+#6 animals for which euthanization was not planned: G13M006 (breeder G13), Z3M006 (Breeder Z3), Z3M025 (helper Z3), Z4M001 (breeder Bshary), G4F022 (LHAM control found in Curie), ARF013 (euthanized animal due to paralyzation)
+
+#4x pups for Shazia: VIF018, ENM014, MEM026, TSM053 done for shazia
+
+#2x Breeding Females
+ #L2F020 LHAM Amboseli
+ #HEF001 LHAM Virunga (Control HEF003 had become breeder in Hermes)
+
+#3x Non-breeding females
+ # G4F019 LHAM  
+ #G1F022 LHAM 
+ #ARF002 LHAM 
+
+#5x Breeding males
+ #CUM002 LHAM Amboseli
+ #CRM003 LHAM Virunga
+ #Z1M022 LHAM Aloatra
+ #LOM002 LHAM Kilimanjaro
+ #LOM008 Non-experimental Masai Mara
+
+#5x Non-breeding males
+ #CUM003 LHAM Helper (euthanized for Shazia, why wasn't it euthanized at same time than    CUM002? possibly because alone in its tunnel system CUT001)
+ #GLM003 Shazia 12M
+ #L6M014 Shazia 12M
+ #LYM003 Shazia Old
+ #SAM002 Shazia Old
+
+
+#Experimentals animals that were not punched
+LHAMT_ExperimentalNotPunched <- LHAMT_AnimalInfo_All %>% 
+  filter(LHAMT_Euthanized == "Yes") %>% 
+  filter(!(is.na(ExperimentalUnit))) %>% 
+  filter(is.na(Punched)) %>% 
+  select(Sex, ExperimentalUnit, BreedingStatus,AnimalID)
+View(LHAMT_ExperimentalNotPunched)
+#10 experimentals animals were among the 25 non-punched animals
+#All of them were single representative of their Experiment Unit at the exception of Experimental Unit Male 4 (CUM002, Amoboseli; CUM003, Curie)
+
+
+#Experimental units in which not all animals were punched 
+LHAM_IncompletePunch <- LHAMT_AnimalInfo_All %>% 
+              filter(Punched == "Yes") %>%
+              filter(!(is.na(ExperimentalUnit))) %>% 
+              select(Sex,ExperimentalUnit,AnimalID,BreedingStatus) %>% #get all experiment animals that were punched
+  inner_join(., LHAMT_AnimalInfo_All %>% #join to same Sex and Experiment Unit that were not punched
+  filter(is.na(Punched)) %>% 
+  select(Sex, ExperimentalUnit, BreedingStatus,AnimalID),by=c("Sex","ExperimentalUnit"))
+View(LHAM_IncompletePunch)
+#There are 2 experimental animals that were not punched and should ideally have since a representant of their experimental unit was punched. The 2 experimental units were only constituted of a solitary and a helper but not by a breeder
+#G1F022 LHAM helper, G1F025 is a solitary that had been punched
+#G4F019 LHAM helper (had emigrated into Tesla on the 6th Dec 2017 the day was supposed to be euthanized, was euthanized the day after), G4F020 is a solitary that had been punched
+  
+
+#Experimental and non-experimental animals from same StartColony that were not entirely punched
+LHAMT_IncompletePunch <- LHAMT_AnimalInfo_All %>% 
+  filter(Punched == "Yes") %>%
+  filter(!(Training == "Yes")) %>% 
+  select(Sex,StartGroup,AnimalID,Queried_BreedingStatus) %>% #get all non-training animals that were punched
+  inner_join(., LHAMT_AnimalInfo_All %>% #join to same Sex and StartColony that were not punched
+               filter(is.na(Punched)) %>% 
+               select(Sex, StartGroup, ExperimentalUnit,BreedingStatus,AnimalID),by=c("Sex","StartGroup"))
+View(LHAMT_IncompletePunch)
+#it looks like that none of the unpunched animals were of the same group as the punched animals, beside the 2 experimental animals mentionned above
+
+
+
+#################################################Sequencing
+
+Sequenced_Subset <- LHAMT_AnimalInfo_All %>% 
+  filter(Sequenced == "Yes")
+View(Sequenced_Subset)
+#54 distinct animals were sequenced
+#Thus seems all punched animals were sequenced
+
+#Data check: Animals sequenced but not punched
+View(anti_join(LHAMT_AnimalInfo_All %>% 
+  filter(Sequenced == "Yes"),LHAMT_AnimalInfo_All %>% 
+  filter(Punched == "Yes"),by=("AnimalID")))
+#It seemed that CRF007 did not appear on the Punches file. 
+#CRF002 had been duplicated. Excel file has been corrected but must be checked on paper sheet
+
+
+#Join the Info on animals which brain had been punched with sequencing info
+SequencingInfo <- Sequenced_Subset %>% 
+  left_join(.,LHAMT_Sequenced %>% 
+              select(AnimalID, BrainRegion))
+View(SequencingInfo)
+
+
+#Animals that were considered as training animals and that were sequenced
+LHAMT_Training_Sequenced <- LHAMT_AnimalInfo_All %>% 
+       filter(Sequenced == "Yes") %>%
+       filter(Training == "Yes")
+View(LHAMT_Training_Sequenced)
+#4 animals that were sequenced were considered as training animals 
+#L2F009: Was in L2T002 when euthanized
+#L2F010: Was in L2T002 when euthanized
+#Z3F022: Was in Z3T003 when euthanized
+#BEF001:had a calcified growth on lower right jaw. Had been monitored for a month before was decided to euthanize. Have a look at weight profile to assess whether could be used or not.
+#Analyses should be considered in their absence
+
+
+#Group Size of animals that were sequenced and considered as training 
+Training_Membership <- membership(LHAMT_Training_Sequenced %>% 
+                                  select(AnimalID, DeathDate) %>% 
+                                  rename(Date = DeathDate) %>% 
+                                  mutate(Date = Date -7),MembershipBetweenV2)
+View(Training_Membership)
+
+Training_GroupSize <- groupcomp(Training_Membership %>% 
+                                  select(Colony,Date),
+                                MembershipBetweenV2)
+#Z3F022 should be considered as a solitary female
+#L2F009 and F010 were living together 
+
+
+#Table of female experimental and non-experimental animals 
+Female_Dataset_Table <- Punched_Subset %>% 
+  filter(Sex == "F") %>% 
+  select(AnimalID, Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>%
+  #GROUP BY 
+  group_by(Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = Queried_BreedingStatus, values_from = Count) %>% 
+  rename(StartColony = DevelopingColony) %>% 
+  arrange(Sex,StartColony, ExperimentalUnit) %>% 
+  replace_na(list(Breeder = 0, Helper = 0, Solitary = 0, ExperimentalUnit = "Non-Experimental"))
+View(Female_Dataset_Table)
+
+
+#Table of male experimental and non-experimental animals 
+Male_Dataset_Table <- Punched_Subset %>% 
+  filter(Sex == "M") %>% 
+  select(AnimalID, Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>%
+  #GROUP BY 
+  group_by(Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = Queried_BreedingStatus, values_from = Count) %>% 
+  rename(StartColony = DevelopingColony) %>% 
+  arrange(Sex,StartColony, ExperimentalUnit) %>% 
+  replace_na(list(Breeder = 0, Helper = 0, Solitary = 0, ExperimentalUnit = "Non-Experimental"))
+View(Male_Dataset_Table)
+
+
+#Brain region sequenced by animal ID for female 
+Female_Brainregion_Table <- SequencingInfo %>% 
+  filter(Sex == "F") %>% 
+  select(AnimalID, Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus, BrainRegion) %>%
+  #GROUP BY 
+  group_by(AnimalID,Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus,BrainRegion) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = BrainRegion, values_from = Count) %>% 
+  rename(StartColony = DevelopingColony) %>% 
+  arrange(StartColony, ExperimentalUnit) %>% 
+  replace_na(list(AMY = 0, CA1 = 0, CA3 = 0, mPA = 0, ExperimentalUnit = "Non-Experimental" ))
+View(Female_Brainregion_Table)
+
+
+#Brain region sequenced by animal ID for male 
+Male_Brainregion_Table <- SequencingInfo %>% 
+  filter(Sex == "M") %>% 
+  select(AnimalID, Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus, BrainRegion) %>%
+  #GROUP BY 
+  group_by(AnimalID,Sex, DevelopingColony, ExperimentalUnit, Queried_BreedingStatus,BrainRegion) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = BrainRegion, values_from = Count) %>% 
+  rename(StartColony = DevelopingColony) %>% 
+  arrange(Sex,StartColony, ExperimentalUnit) %>% 
+  replace_na(list(AMY = 0, CA1 = 0, CA3 = 0, mPA = 0, ExperimentalUnit = "Non-Experimental" ))
+View(Male_Brainregion_Table)
+
+
+#sample size of brain regions by Breeding status 
+Sequenced_Brainregion_Dataset_Table <- SequencingInfo %>% 
+  select(Sex, Queried_BreedingStatus, BrainRegion) %>%
+  #GROUP BY 
+  group_by(Sex,BrainRegion, Queried_BreedingStatus) %>% 
+  summarise(Count = n()) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  pivot_wider(names_from = Queried_BreedingStatus, values_from = Count) %>%
+  replace_na(list(Solitary = 0))
+View(Sequenced_Brainregion_Dataset_Table)
+
+write.csv(Sequenced_Brainregion_Dataset_Table,"Sequenced_Brainregion_Dataset_Table.csv",row.names = FALSE)
+
+
+
+##############################################Sample size for mPOA
+
+mPOA_Subset <- SequencingInfo %>% 
+  filter(BrainRegion == "mPA")
+View(mPOA_Subset)
+
+table(Punched_Experimental$Sex, Punched_Experimental$Queried_BreedingStatus)
+
+
+###############################################Sample size for CA1
+
+###############################################Sample size for CA3 
+
+###############################################Sample size for Amy
+
+```
+
+
+
+## Urine and Plasma samples
+
+Urine and plasma samples collected after the experiment start of LHAM subject that were euthanized will be exported. 
+
+For non-experimental non-breeding individuals I assigned a dummy experimental start day corresponding to the mean average duration of the expriment for experimental subjects (500 days). For non-experimental breeders (G3M020, G10F024), I assigned the pairing date as a start date. For experimental animals the start date of the experiment was the date they were paired.
+
+All samples collected after the experiment started should be returned by the list. All pre-pairing have currently not been selected for urine as urine sample for pairing have not been selected for LHAM experiment (but Plasma has)
+
+
+```{r data prep}
+
+#Duration of experiment of animals part of LHAMT for which some of the brain region were sequenced
+summary(as.numeric(Sequenced_Subset$Experiment_Duration))
+#the maximum duration of the experiment was 23.63 months 
+#the mean duration of experiment was 16.40 months
+#the median duration of experiment was 18.76
+
+
+#Min age at which an animal started the experiment
+summary(as.numeric(Sequenced_Subset$ExperimentStartAge))
+#the younger subject who started the experiment was 13.63 months 
+
+View(Sequenced_Subset)
+
+###############################################Determination of time period during which animals where available
+
+#Time period during which animals were available
+TimePeriod_All <- Sequenced_Subset %>% 
+  mutate(ExperimentStartDate = case_when(is.na(ExperimentStartDate) ~ DeathDate - 500,
+                                         TRUE ~ ExperimentStartDate)) %>% #assign a fake experiment date to non experimental animals coresponding to 16.4 montsh (average experiment time)
+  mutate(Experiment_Duration = case_when(is.na(Experiment_Duration) ~ (DeathDate - ExperimentStartDate)/30.4375,
+                                         TRUE ~ Experiment_Duration)) %>% 
+  select(AnimalID,BirthDate,ExperimentStartDate,DeathDate,Experiment_Duration) %>%
+  mutate(OneYear_BDay = BirthDate %m+% period("12 month")) %>% 
+  mutate(Three_M = DeathDate %m-% period("3 month"),
+         Six_M = DeathDate %m-% period("6 month"),
+         Nine_M = DeathDate %m-% period("9 month"),
+         Twelve_M = DeathDate %m-% period("12 month"),
+         Fifteen_M = DeathDate %m-% period("15 month"),
+         Eighteen_M = DeathDate %m-% period("18 month"),
+         TwentyOne_M = DeathDate %m-% period("21 month"),
+         TwentyFour_M = DeathDate %m-% period("24 month")) %>% 
+  pivot_longer(Three_M:TwentyFour_M,names_to = "Period", values_to = "PeriodDate" ) %>% 
+  mutate(PeriodAge = (PeriodDate - BirthDate)/30.4375) %>% 
+  arrange(AnimalID)
+View(TimePeriod_All)
+names(TimePeriod)
+View(LHAMT_AnimalInfo_All)
+
+#6 months time period during which animals were alive and older than 12months after the experiment start 
+#This does not include start date for animals which may have less than 
+AnimalID_TimePeriod_First <- TimePeriod_All %>% 
+  filter(Period %in% c("Six_M", "Twelve_M","Eighteen_M","TwentyFour_M")) %>% 
+  #GROUP BY AnimalID
+  group_by(AnimalID) %>% 
+  arrange(desc(PeriodDate)) %>% 
+  mutate(NextPeriod = lead(Period)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  filter((PeriodAge > 12 |is.na(BirthDate)) & PeriodDate > (ExperimentStartDate) | Experiment_Duration < 6 & Period == "Six_M") %>% #retain 6 months period for which animals are older than 12 months and that starts after experiment stardt
+  mutate(PeriodType = case_when(Experiment_Duration < 6 & Period == "Six_M" 
+                                ~ "Last",
+                                TRUE ~ "First")) %>% 
+  mutate(PeriodDate = case_when(PeriodDate < ExperimentStartDate ~ ExperimentStartDate,
+                                TRUE ~ PeriodDate))
+View(AnimalID_TimePeriod_First)
+
+
+#First available time period
+AnimalID_TimePeriod_Last<- AnimalID_TimePeriod_First  %>%
+  #GROUP BY 
+  group_by(AnimalID) %>% 
+  slice_min(PeriodDate) %>% #get the first time period
+  ungroup() %>% 
+  #UNGROUP
+  select(AnimalID,NextPeriod) %>% 
+  rename(Period = NextPeriod) %>% 
+  left_join(.,TimePeriod_All) %>% 
+  filter(Experiment_Duration > 6) %>% #to avoid getting the 12 months period if the experiment lasted less than 6 months  
+  mutate(PeriodDate = case_when(OneYear_BDay > ExperimentStartDate ~ OneYear_BDay,
+                                OneYear_BDay < ExperimentStartDate |is.na(BirthDate) ~ ExperimentStartDate)) %>% 
+  mutate(PeriodType = "Last")
+View(AnimalID_TimePeriod_First)
+#52 individuals 
+# there is a loss of 2 animals in comparison to the 54 euthanized animals. I need to have a look why
+
+
+#Datacheck
+anti_join(Sequenced_Subset %>% 
+            select(AnimalID),AnimalID_TimePeriod_First)
+
+
+#Bind row of first period after experiment start with other time period until death
+AnimalID_AvailablePeriod <- bind_rows(AnimalID_TimePeriod_First,AnimalID_TimePeriod_Last) %>% 
+  select(AnimalID,Period,PeriodDate,PeriodType) %>% 
+  bind_rows(.,LHAMT_AnimalInfo_All %>% 
+              select(AnimalID,DeathDate) %>% 
+              rename(PeriodDate = DeathDate) %>% 
+              mutate(Period = "Death")) %>% #Join individual info
+  arrange(AnimalID,desc(PeriodDate)) %>% 
+  #GROUP BY ANIMALID
+  group_by(AnimalID) %>% 
+  mutate(EndPeriod = lead(Period),
+         EndPeriodDate = lead(PeriodDate),
+         EndPeriodType = lead(PeriodType)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  mutate_at("EndPeriod", ~fct_relevel(.x, "Eighteen_M", after=2)) %>% #relevel Eighteen M as third level
+  filter(!(is.na(EndPeriod)))
+View(AnimalID_AvailablePeriod)
+  
+
+#PeriodList
+PeriodList <- AnimalID_AvailablePeriod %>% 
+  distinct(AnimalID,EndPeriod,EndPeriodDate,EndPeriodType)
+View(PeriodList)
+
+
+######################Add period for which there may be zeros
+#One must take into account that BF can be pregnant or not pregnant 
+
+#to allow separation of breeders preg and non preg
+BreederPregnancy <- tibble(BreedingStatus = c("PregnantBreeder","NonPregnantBreeder"))
+
+
+#select BF from LHAMT
+LHAMT_BF <- Sequenced_Subset %>% 
+  filter(Sex == "F",
+         Queried_BreedingStatus == "Breeder") %>% 
+select(AnimalID,Sex)
+View(LHAMT_BF)
+
+
+#create the 2 categories of BF
+LHAMT_BF_PregSeparated <- expand_grid(LHAMT_BF,BreederPregnancy)
+View(LHAMT_BF_PregSeparated)
+
+
+#Animals other than BF
+LHAMT_NotBF <- Sequenced_Subset%>% 
+  filter(!(Sex == "F" & Queried_BreedingStatus == "Breeder")) %>% 
+select(AnimalID, Sex, Queried_BreedingStatus) %>% 
+  rename(BreedingStatus = Queried_BreedingStatus)
+View(LHAMT_NotBF)
+
+
+#bind rows of BF (preg and non-preg) with other animals
+LHAMT_AnimalID_BreedingStatus_Gestation <- bind_rows(LHAMT_BF_PregSeparated,LHAMT_NotBF)
+View(LHAMT_AnimalID_BreedingStatus_Gestation)
+
+#Join to period list 
+PeriodList_Gestation <- LHAMT_AnimalID_BreedingStatus_Gestation %>% 
+  left_join(.,PeriodList)
+View(PeriodList_Gestation)
+
+
+#############################################Available samples 
+
+LHAMT_PlasmaUrine <- Sequenced_Subset %>% 
+  left_join(.,PlasmaUrine)
+View(LHAMT_PlasmaUrine)
+#2598 samples collected on euthanized animals
+names(Sequenced_Subset)
+  
+
+#Get gestation status of breeders 
+#Only returns row for individuals that have conceived
+LHAMT_PlasmaUrine_GestationStatus <- LHAMT_PlasmaUrine %>% 
+  distinct(AnimalID,CollectionDate) %>% 
+  left_join(.,Litter_Info %>% 
+              select(AnimalID, IndividualConceptionCount_Total, LitterRef, ParturitionDate)) %>% #shall I add conception or parturition group or whatever
+  mutate(ParturitionCollection_DayDiff = CollectionDate - ParturitionDate) %>% 
+  filter(ParturitionCollection_DayDiff <=0) %>% 
+  #GROUP BY ANIMALID, DATE
+  group_by(AnimalID,CollectionDate) %>% 
+  slice_max(ParturitionCollection_DayDiff) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  rename(NextLitterRef = LitterRef, 
+         NextParturitionDate = ParturitionDate,
+         NextParturitionCollection_DayDiff = ParturitionCollection_DayDiff
+         ) %>% 
+  mutate(GestationStatus = case_when(NextParturitionCollection_DayDiff < -105 ~ "NotPregnant", 
+                                    NextParturitionCollection_DayDiff >= -105 & NextParturitionCollection_DayDiff <= -90 ~ "Conception",
+                                    NextParturitionCollection_DayDiff >= -90 & NextParturitionCollection_DayDiff < -60 ~ "FirstTrimester",
+                                    NextParturitionCollection_DayDiff >= -60 & NextParturitionCollection_DayDiff < -30 ~ "SecondTrimester",
+                                    NextParturitionCollection_DayDiff >= -30 & NextParturitionCollection_DayDiff <=0 ~ "ThirdTrimester")) %>% 
+  rename(NextLitter = IndividualConceptionCount_Total)
+
+View(LHAMT_PlasmaUrine_GestationStatus)
+
+
+#Join gestation info to other info
+LHAMT_PlasmaUrine_WithGestationStatus <- LHAMT_PlasmaUrine %>% 
+left_join(.,LHAMT_PlasmaUrine_GestationStatus)
+View(LHAMT_PlasmaUrine_WithGestationStatus)
+names(LHAMT_PlasmaUrine_WithGestationStatus)
+
+```
+
+
+```{r urine selection}
+
+#Urine collected on LHAMT animals during the period of interest 
+#with gestation status 
+#as a reminder, the period date of the last period of 6 months has been set to when the animal was one year old or at the start of experiment
+LHAMT_Urine_Selection <- AnimalID_AvailablePeriod %>% 
+  left_join(.,LHAMT_PlasmaUrine_WithGestationStatus %>% 
+              filter(SampleType =="Urine",
+                     SampleRepeat == 1)) %>% 
+  filter(CollectionDate <= PeriodDate & CollectionDate >= EndPeriodDate) %>% 
+  select(AnimalID,Sex,ExpName,ExperimentStartDate,Queried_BreedingStatus,EndPeriod,EndPeriodDate,EndPeriodType,CollectionDate,NextParturitionCollection_DayDiff,GestationStatus,SampleID) %>% 
+  distinct() %>% 
+  mutate(BreedingStatus = case_when(Sex == "F" & Queried_BreedingStatus == "Breeder" & GestationStatus%in%c("FirstTrimester","SecondTrimester","ThirdTrimester") ~ "PregnantBreeder",
+Sex == "F" & Queried_BreedingStatus == "Breeder" & !(GestationStatus%in%c("FirstTrimester","SecondTrimester","ThirdTrimester")) ~ "NonPregnantBreeder",
+TRUE~ Queried_BreedingStatus))
+View(LHAMT_Urine_Selection)
+#351 samples
+
+
+
+############################################Sample size 
+
+#Count of samples for each period of interest including gestation sample 
+#This will not show the period during which the animal may have been available but no sample were collected
+LHAMT_Urine_PeriodCount <- LHAMT_Urine_Selection %>% 
+  #GROUP BY ANIMALID, SEX, BREEDINGSTATUS,PERIOD, PERIOD DATE
+group_by(AnimalID,Sex,BreedingStatus,EndPeriod,EndPeriodDate,EndPeriodType) %>% 
+  summarize(SampleCount = n_distinct(SampleID)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  arrange(AnimalID,desc(EndPeriodDate))
+View(LHAMT_Urine_PeriodCount)
+
+
+sum(LHAMT_Urine_PeriodCount$SampleCount)
+#351 samples available
+
+
+#Count by period for each animal with separation with breeding status
+LHAMT_Urine_PeriodCount_WithZero<- PeriodList_Gestation  %>% 
+  left_join(LHAMT_Urine_PeriodCount) %>% 
+  replace_na(list(SampleCount = 0)) %>% 
+  mutate_at("BreedingStatus", ~fct_relevel(.x, "PregnantBreeder","NonPregnantBreeder","Solitary")) 
+
+
+##################################################Graphical representation 
+
+#Female 
+LHAMT_Female_Urine_Figure<- ggplot(LHAMT_Urine_PeriodCount_WithZero %>% 
+                              filter(Sex == "F"), aes(x=EndPeriod,y=SampleCount)) +
+  geom_boxplot() +
+  geom_line(aes(group = AnimalID), alpha = 0.2) +
+  facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() +
+  geom_jitter(width=0.15, height = 0, size=3.5, alpha = 0.4, aes(col = EndPeriodType),show.legend = FALSE)+
+  scale_y_continuous(breaks=seq(0, 10, 2),limits = c(0,9)) #,limits = c(0,8)
+LHAMT_Female_Urine_Figure
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(LHAMT_Female_Urine_Figure)) %>% 
+  print(.,target="LHAMT_Urine_Female.pptx")
+
+
+#Male
+LHAMT_Male_Urine_Figure<- ggplot(LHAMT_Urine_PeriodCount_WithZero %>% 
+                              filter(Sex == "M"), aes(x=EndPeriod,y=SampleCount)) +
+  geom_boxplot() +
+  geom_line(aes(group = AnimalID), alpha = 0.2) +
+  facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() +
+  geom_jitter(width=0.15, height = 0, size=3.5, alpha = 0.4, aes(col = EndPeriodType),show.legend = FALSE)+
+  scale_y_continuous(breaks=seq(0, 6, 2),limits = c(0,7))
+LHAMT_Male_Urine_Figure
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(LHAMT_Male_Urine_Figure)) %>% 
+  print(.,target="LHAMT_Urine_Male.pptx")
+    
+  
+```
+
+
+```{r Urine selection}
+
+Urine_Selection <- LHAMT_Urine_Selection %>% 
+  select(AnimalID,CollectionDate,SampleID) %>% 
+  left_join(.,Samples_Exported %>% 
+              filter(SampleType == "Urine") %>% 
+              select(SampleNumber,Date_Exported,Purpose,DestinationLab), by=c("SampleID" = "SampleNumber"))
+View(Urine_Selection)
+
+View(Urine_Selection %>% 
+       filter(is.na(Date_Exported)))
+#262 samples that have not been exported
+
+View(Urine_Selection %>% 
+       filter(DestinationLab == "LARG"))
+#262 samples that have not been exported 
+
+```
+
+
+One of the issue with plasma is that a large number have been exported to LARG (approximately 1/4)
+```{r Plasma selection}
+
+#Plasma collected on LHAMT animals during the period of interest 
+#with gestation status 
+LHAMT_Plasma_Selection <- AnimalID_AvailablePeriod %>% 
+  left_join(.,LHAMT_PlasmaUrine_WithGestationStatus %>% 
+              filter(SampleType =="Plasma")) %>% 
+  filter(CollectionDate <= PeriodDate & CollectionDate >= EndPeriodDate) %>% 
+  select(AnimalID,Sex,ExpName,ExperimentStartDate,Queried_BreedingStatus,EndPeriod,EndPeriodDate,EndPeriodType,CollectionDate,NextParturitionCollection_DayDiff,GestationStatus,SampleID) %>% 
+  distinct() %>% 
+  mutate(BreedingStatus = case_when(Sex == "F" & Queried_BreedingStatus == "Breeder" & GestationStatus%in%c("FirstTrimester","SecondTrimester","ThirdTrimester") ~ "PregnantBreeder",
+Sex == "F" & Queried_BreedingStatus == "Breeder" & !(GestationStatus%in%c("FirstTrimester","SecondTrimester","ThirdTrimester")) ~ "NonPregnantBreeder",
+TRUE~ Queried_BreedingStatus))
+
+View(LHAMT_Plasma_Selection)
+#380 samples
+
+
+############################################Sample size 
+
+#Count of samples for each period of interest including gestation sample 
+#This will not show the period during which the animal may have been available but no sample were collected
+LHAMT_Plasma_PeriodCount <- LHAMT_Plasma_Selection %>% 
+  #GROUP BY ANIMALID, SEX, BREEDINGSTATUS,PERIOD, PERIOD DATE
+group_by(AnimalID,Sex,BreedingStatus,EndPeriod,EndPeriodDate,EndPeriodType) %>% 
+  summarize(SampleCount = n_distinct(SampleID)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  arrange(AnimalID,desc(EndPeriodDate))
+View(LHAMT_Plasma_PeriodCount)
+
+
+sum(LHAMT_Plasma_PeriodCount$SampleCount)
+#351 samples available
+
+
+#Count by period for each animal with separation with breeding status
+LHAMT_Plasma_PeriodCount_WithZero<- PeriodList_Gestation  %>% 
+  left_join(LHAMT_Plasma_PeriodCount) %>% 
+  replace_na(list(SampleCount = 0)) %>% 
+  mutate_at("BreedingStatus", ~fct_relevel(.x, "PregnantBreeder","NonPregnantBreeder","Solitary")) 
+View(LHAMT_Plasma_PeriodCount_WithZero)
+
+
+
+##################################################Graphical representation 
+
+#Female 
+LHAMT_Female_Plasma_Figure<- ggplot(LHAMT_Plasma_PeriodCount_WithZero %>% 
+                              filter(Sex == "F"), aes(x=EndPeriod,y=SampleCount)) +
+  geom_boxplot() +
+  geom_line(aes(group = AnimalID), alpha = 0.2) +
+  facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() +
+  geom_jitter(width=0.15, height = 0, size=4, alpha = 0.4, aes(col = EndPeriodType),show.legend = FALSE)+
+  scale_y_continuous(breaks=seq(0, 10, 2),limits = c(0,8)) #,limits = c(0,8)
+LHAMT_Female_Plasma_Figure
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(LHAMT_Female_Plasma_Figure)) %>% 
+  print(.,target="LHAMT_Plasma_Female.pptx")
+
+
+#Male
+LHAMT_Male_Plasma_Figure<- ggplot(LHAMT_Plasma_PeriodCount_WithZero %>% 
+                              filter(Sex == "M"), aes(x=EndPeriod,y=SampleCount)) +
+  geom_boxplot() +
+  geom_line(aes(group = AnimalID), alpha = 0.2) +
+  facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() +
+  geom_jitter(width=0.15, height = 0, size=4, alpha = 0.4, aes(col = EndPeriodType),show.legend = FALSE)+
+  scale_y_continuous(breaks=seq(0, 6, 2),limits = c(0,8))
+LHAMT_Male_Plasma_Figure
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(LHAMT_Male_Plasma_Figure)) %>% 
+  print(.,target="LHAMT_Plasma_Male.pptx")
+    
+  
+```
+
+
+```{r Plasma selection}
+
+Plasma_Selection <- LHAMT_Plasma_Selection %>% 
+  select(AnimalID,CollectionDate,SampleID) %>% 
+  left_join(.,Samples_Exported %>% 
+              filter(SampleType == "Plasma") %>% 
+              select(SampleNumber,Date_Exported,Purpose,DestinationLab), by=c("SampleID" = "SampleNumber"))
+View(Plasma_Selection)
+
+View(Plasma_Selection %>% 
+       filter(is.na(Date_Exported)))
+#153 samples that have not been exported
+
+View(Plasma_Selection %>% 
+       filter(DestinationLab == "LARG"))
+#115 samples have been exported to LARG
+#Are they still useable?
+
+```
+
+
+##Scan behaviours
+
+```{r Scan selection}
+
+#Scan observation performed on sequenced animals 
+#Must have Group, ObsDate, AnimalID 
+LHAMT_Scan <- Sequenced_Subset %>% 
+    left_join(.,IndividualScanDate_OldNew_All)
+#1353 scans were collected on animals that were sequenced
+
+
+#Scan dates on LHAMT animals during the period of interest 
+LHAMT_Scan_Selection <- AnimalID_AvailablePeriod %>% 
+  left_join(.,LHAMT_Scan) %>% 
+  filter(ObsDate <= PeriodDate & ObsDate >= EndPeriodDate) %>% 
+  select(AnimalID,Sex,ExpName,ExperimentStartDate,Queried_BreedingStatus,EndPeriod,EndPeriodDate,EndPeriodType,ObsDate) %>% 
+  distinct()
+View(LHAMT_Scan_Selection)
+#341 samples
+
+
+############################################Sample size 
+
+#Count of samples for each period of interest including gestation sample 
+#This will not show the period during which the animal may have been available but no sample were collected
+LHAMT_Scan_PeriodCount <- LHAMT_Scan_Selection %>% 
+  #GROUP BY ANIMALID, SEX, BREEDINGSTATUS,PERIOD, PERIOD DATE
+group_by(AnimalID,Sex,Queried_BreedingStatus,EndPeriod,EndPeriodDate,EndPeriodType) %>% 
+  summarize(ScanCount = n_distinct(ObsDate)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  arrange(AnimalID,desc(EndPeriodDate))
+View(LHAMT_Scan_PeriodCount)
+
+
+sum(LHAMT_Scan_PeriodCount$ScanCount)
+#351 samples available
+
+
+#Count by period for each animal with separation with breeding status
+LHAMT_Scan_PeriodCount_WithZero<- PeriodList  %>% 
+  left_join(LHAMT_AnimalInfo_All %>% 
+              select(AnimalID,Sex,Queried_BreedingStatus)) %>% 
+  left_join(LHAMT_Scan_PeriodCount) %>% 
+  replace_na(list(ScanCount = 0)) %>% 
+  mutate(BreedingStatus = Queried_BreedingStatus)
+View(LHAMT_Scan_PeriodCount_WithZero)
+
+names(PeriodList)
+names(LHAMT_AnimalInfo_All)
+
+##################################################Graphical representation 
+
+#Female 
+LHAMT_Female_Scan_Figure<- ggplot(LHAMT_Scan_PeriodCount_WithZero %>% 
+                              filter(Sex == "F"), aes(x=EndPeriod,y=ScanCount)) +
+  geom_boxplot() +
+  geom_line(aes(group = AnimalID), alpha = 0.2) +
+  facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() +
+  geom_jitter(width=0.15, height = 0, size=4, alpha = 0.4, aes(col = EndPeriodType),show.legend = FALSE)+
+  scale_y_continuous(breaks=seq(0, 10, 2),limits = c(0,11)) #,limits = c(0,8)
+LHAMT_Female_Scan_Figure
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(LHAMT_Female_Scan_Figure)) %>% 
+  print(.,target="LHAMT_Scan_Female.pptx")
+
+
+#Male
+LHAMT_Male_Scan_Figure<- ggplot(LHAMT_Scan_PeriodCount_WithZero %>% 
+                              filter(Sex == "M"), aes(x=EndPeriod,y=ScanCount)) +
+  geom_boxplot() +
+  geom_line(aes(group = AnimalID), alpha = 0.2) +
+  facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() +
+  geom_jitter(width=0.15, height = 0, size=4, alpha = 0.4, aes(col = EndPeriodType),show.legend = FALSE)+
+  scale_y_continuous(breaks=seq(0, 10, 2),limits = c(0,10))
+
+LHAMT_Male_Scan_Figure
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(LHAMT_Male_Scan_Figure)) %>% 
+  print(.,target="LHAMT_Scan_Male.pptx")
+    
+  
+
+
+```
+

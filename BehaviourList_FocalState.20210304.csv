@@ -1,0 +1,24 @@
+"CodeRef","Label","Value","BehaviourRaw","ReceivedValue"
+"FocalStateBehav","Beg/Suckle",2,"Beg/Suckle",NA
+"FocalStateBehav","Carry food",5,"Carry food",NA
+"FocalStateBehav","Carry NM",6,"Carry NM",NA
+"FocalStateBehav","Dig",10,"Dig",NA
+"FocalStateBehav","Eat",13,"Eat",NA
+"FocalStateBehav","Gnaw",14,"Gnaw",NA
+"FocalStateBehav","Groom",15,"RGroom",0
+"FocalStateBehav","Groom",15,"Groom",1
+"FocalStateBehav","Huddeling",17,"RHuddle",0
+"FocalStateBehav","Huddeling",17,"Huddeling",1
+"FocalStateBehav","Kick",18,"Kick",NA
+"FocalStateBehav","Miscellaneous",19,"Miscellaneous",NA
+"FocalStateBehav","Nest Building",20,"Nest Building",NA
+"FocalStateBehav","Out of sight",21,"Out of sight",NA
+"FocalStateBehav","Rest",25,"Rest",NA
+"FocalStateBehav","Self groom",27,"Self groom",NA
+"FocalStateBehav","Sex forplay",28,"RSex forplay",0
+"FocalStateBehav","Sex forplay",28,"Sex forplay",1
+"FocalStateBehav","Sex forplay",28,"RSex foreplay",0
+"FocalStateBehav","Sparr",30,"Sparr",NA
+"FocalStateBehav","Sweep",32,"Sweep",NA
+"FocalStateBehav","Drumming",35,"Drumming",NA
+"FocalStateBehav","Drumming",35,"RDrumming",0

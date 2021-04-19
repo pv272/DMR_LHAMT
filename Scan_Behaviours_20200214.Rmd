@@ -1,0 +1,353 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r package}
+
+rm(list = ls())
+
+#Data tidying
+library(tidyverse)
+
+
+#Data
+library(broom)
+library(tidyverse)
+library(cowplot)#
+library(ggcorrplot)#
+library(PerformanceAnalytics)#For correlation plot
+library(gridExtra)#
+library(FactoMineR)#
+library(factoextra)#
+
+```
+
+
+#Info and functions
+```{r data and functions}
+
+#extract relevant info from database
+#don't run the new behaviour import if not necessary because it takes for ages
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/Database_Extract_20210113.R")
+
+#Load relevant functions
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/DMRfunctions_20210202.R")
+
+#Prepare most relevant data
+#I could already have all
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/DataPreparation_20200113.R")
+
+```
+
+
+#Data preparation
+
+Once a good pipeline is in place we may be able to move that to data preparation and functions
+
+##Scan
+
+Old and new data are not merged yet. Until it is done, it makes no sense to focus on continuous data as I guess that would be a loss of time
+
+```{r Scan data}
+
+#scan session details
+#Old scan session details are available from Scan_SessionDetails, which comes from user_philippev
+View(Scan_SessionDetails)
+names(Scan_SessionDetails)
+#1650 scan sessions
+
+#Get behaviours from all scan observations performed so far
+#Continuous behaviours are not analyses friendly and something should be done about it
+Scan_Behaviours <- scan_behaviour_count(Scan_SessionDetails)
+View(Scan_Behaviours)
+
+
+#Join Session details and behaviours
+Scan_ColonyBehaviour <- Scan_SessionDetails %>% 
+  select(Colony,ObsRef,ObsDate) %>% 
+  left_join(.,Scan_Behaviours)
+View(Scan_ColonyBehaviour)
+
+
+
+#Continuous behaviours
+# I will have to generate the zero
+ScanCont_Behaviours <- Scan_Behaviours %>% 
+  filter(ObsType == "ScanCont") %>% 
+  distinct(Behaviour)
+View(ScanCont_Behaviours)
+#Continuous behaviours during scan old import consist of 
+#Biting                 AnimalID            BodyPart
+#Carry Pup              PupID
+#Chase                  AnimalID
+#Coprophagy             Never recorded
+#Copulation             AnimalID            Success           Direction
+#DropFS                 
+#Food comp              AnimalID            Location          FoodStore
+#Groom.                 AnimalID            Duration          Reciprocation
+#Nest Build             Carry/Build
+#Overt Aggress          AnimalID
+#Pass                   AnimalID            Direction         Over/Under
+#Pull Tail              AnimalID
+#Pump.                  Number
+#Sex Forplay            AnimalID            Duration
+#Sniff.                 AnimalID            Location          BodyPart
+#Sparr                  AnimalID            Duration
+#Submiss                AnimalID            Count             Context
+
+#I think pass, copulation, Nest build? could be divided by their divider 
+
+#the earliest dropFS comes from 15th June 2016, not sure how consistent it was at the beginning
+
+
+```
+
+
+##Animal Info
+```{r Animal Info }
+
+#######################################List of Colony/AnimalID/Date
+
+#Queried group composition on days of observation
+#It doesnt mean that all animals queried were part of scan
+#it is also possible that some animals may be wrongly assigned to a given colony and were not observed
+Scan_GroupComp_Queried <- groupcomp(Scan_SessionDetails %>% 
+  select(ObsRef,Colony,ObsDate), Date = ObsDate) %>% 
+    distinct(ObsDate,Colony,AnimalID)
+View(Scan_GroupComp_Queried)
+#13537
+
+
+#Get group composition based on which animals were observed during a scan session 
+#It could be that the composition is not exact as some animals may have been excluded from the scan observation
+Scan_GroupComp_Observed <- Scan_SessionDetails %>% 
+  select(ObsRef,Colony,ObsDate) %>% 
+  left_join(.,Scan_Behaviours %>%
+              select(ObsRef,AnimalID)) %>% 
+  distinct(ObsDate,Colony,AnimalID) %>% 
+  mutate(AnimalID = toupper(AnimalID))
+View(Scan_GroupComp_Observed)
+#13'199
+
+
+#Get group composition after merging group comp queried and animal observed
+GroupComp_Scan <- bind_rows(Scan_GroupComp_Queried,Scan_GroupComp_Observed) %>% 
+  distinct()
+View(GroupComp_Scan)
+#13'572
+
+
+#######################################Static info
+
+#fixed characteristics of individual 
+AnimalID_Static_Scan <- idinfo_static(GroupComp_Scan %>% 
+  distinct(AnimalID))
+View(AnimalID_Static_Scan)
+#in the old data 890 individuals have been observed 
+
+
+#######################################Dynamic info
+
+#Get a list of dates of interest, AnimalID and static info 
+#Should have 13'572 rows
+AnimalID_Static_ScanDates<- GroupComp_Scan %>%
+  left_join(.,AnimalID_Static_Scan)
+View(AnimalID_Static_ScanDates)
+#13567, loss of 5 rows
+
+
+#Individual Info
+#Age <- age_inmonths()
+#Breeding Status <- breedingstatus 
+#Gestation status <- gestationstatus(); function is not terminated to determine breeding status after last parturition
+#weight <- clsosestweight()
+AnimalID_Dynamic_Scan <- AnimalID_Static_ScanDates %>% 
+  age_inmonths(Date = ObsDate) %>% 
+  breedingstatus(Date = ObsDate) %>% 
+  left_join(.,gestationstatus(DF = AnimalID_Static_ScanDates)) %>% 
+  left_join(.,closestweight(DF1 = AnimalID_Static_ScanDates %>% 
+                              select(AnimalID,ObsDate), DF2 = tblWeights, Date = ObsDate))
+View(AnimalID_Dynamic_Scan)
+#13'567
+
+
+#Ask Colin why it doesn't work
+# poo <-  AnimalID_Scan_Dynamic %>% 
+#     mutate(EndDate = case_when(!(is.na(DeathDate)) ~ DeathDate,
+#                                TRUE ~ today())) %>% #assign an "End Date for each female
+#     left_join(.,Litter_Info %>% 
+#                  filter(Sex == "F") %>% 
+#                  select(AnimalID, IndividualConceptionCount_Total, OffspringLitterRef, ParturitionDate)) %>% #shall I add conception or parturition group or whatever?
+#   mutate(ParturitionCollection_DayDiff = as.integer(ObsDate - ParturitionDate),#delay between date of interest and parturition
+#          ) %>% 
+#   filter(ObsDate >= FirstParturitionDate -105) %>% #one wants 
+#   #GROUP BY ANIMALID, DATE
+#   group_by(AnimalID, ObsDate) %>% 
+#   filter(ObsDate < ParturitionDate & ParturitionCollection_DayDiff == max(ParturitionCollection_DayDiff)) #Why doesn't it work?
+```
+
+
+## Group Info 
+
+```{r Group Info}
+
+#Get info on group conposition
+#A current limitation is that all individuals who were wild caught are considered older than 18 months which is not going to be true for quite a lot of them.
+GroupCompInfo_Scan <- groupinfo(DF = AnimalID_Dynamic_Scan %>% 
+  select(ObsDate,Colony,AnimalID,Sex,Age_Months), Date = ObsDate, Age = Age_Months)
+View(GroupCompInfo_Scan)
+
+#Breeding status of group
+#is actually necessary to get the correct gestation status (see in function)
+
+
+#One thing that will surely be relevant is the size of the tunnel system. One will have to look with Tom where he had that information
+#This will surely need an update from Dave Seager. Have they recorded the information? If yes where? 
+```
+
+
+##All Info
+
+```{r All Info}
+
+AllInfo_Scan <- AnimalID_Dynamic_Scan %>% 
+  left_join(.,GroupCompInfo_Scan) %>% 
+  mutate(Lactating = case_when(Sex == "F" & BreedingStatus ==  "Breeder" & Pup14 > 0 ~ "Lactating", 
+                               TRUE ~ "NotLactating"))
+
+```
+
+
+#Analyses
+
+We will mostly be interested in determining whether behavioural differences are mostly driven by gestation and lactation.
+
+The main questions we will be asking are: 
+Q1: what are the behavioural differences between BF and NBF; Activity? Dominance? Aggressive behaviour? Huddling pups?
+Q2: Are behavioural differences magnified by gestation, lactation
+
+Data visualization:
+V1: violin plot for scan instantaneous
+V2: frequency for scan continuous
+V3: Violin for focal state
+V4: 
+
+Analyses ideas: 
+A1: Correlations between all behaviours (scan and focal) using PCA, heatmat etc
+A2: Multinomial logistic regression to analyse Scan data instantaneous 
+A3: Are BF more aggressive than NBF
+A4: Are BF dominant over NBF 
+A5: effects of pups/lactation on activity 
+
+
+##Scan
+Since scan have not been merged yet, I will focus on instantaneous sampling. I will take care of continuous sampling once merging will have been done
+
+###DataPrep
+
+```{r Scan Data Prep}
+
+#Select the animal info we are likely going to be interested in
+SelectedInfo_Scan <- AllInfo %>% 
+  select(ObsDate,Colony,AnimalID,WildCaught,Sex,Age_Months,Weight,BreedingStatus,GestationStatus,Lactating)
+View(SelectedInfo_Scan)
+
+
+#########################################Behaviours by session
+
+#17 behaviours 
+#As it stands total scan number includes pup carry
+#if it is removed, total scan number should be recalculated
+ScanInst_BySession <- Scan_ColonyBehaviour %>% 
+  filter(ObsType == "ScanInst",
+         !(Behaviour %in% c("Help.Burrow","Active.NoHelp","Help.Total","TotActive"))) %>% 
+  arrange(ObsRef,AnimalID,Behaviour) %>% 
+  mutate(Behaviour = case_when(Behaviour == "Food.Carry" ~ "Foodcarry",
+                               Behaviour == "Nest.Material" ~ "Nestbuilding",
+                               Behaviour == "Pup.Carry" ~ "Pupcarry",
+                               Behaviour == "Self.Groom" ~ "Selfgroom",
+                               Behaviour == "Social.Interact" ~ "Socint",
+                               TRUE ~ Behaviour)) %>% 
+  mutate(Proportion = Count/TotalScanNumber,
+         Category7 = case_when(Behaviour %in% c("Rest","Huddeling") ~ "Rest",
+                               Behaviour %in% c("Dig","Sweep","Kick","LocoWork") ~ "Burrow",
+                               Behaviour %in% c("Gnaw","Other","Pump","Selfgroom","Sniff","Locomotion","Socint") ~ "Activeother",
+                               TRUE ~ Behaviour)) %>% 
+  select(-c(ObsType,Received)) %>% 
+  arrange(Colony,ObsRef,AnimalID,Category7,Behaviour)
+View(ScanInst_BySession)
+
+
+#Join Info of relevance with scan behaviours 
+#animals that will have no behaviours will have been supposed to be in groups but were not observed
+ScanInst_BySession_WithInfo <- SelectedInfo_Scan %>% 
+  left_join(.,ScanInst_BySession) %>% 
+  relocate(ObsRef,.after = ObsDate)
+View(ScanInst_BySession_WithInfo)
+
+
+#Count by categories
+#This could be used for the mulytinomial model
+ScanInst7_BySession_WithInfo <- ScanInst_BySession_WithInfo %>% 
+  #GROUP BY OBSREF, ANIMALID, BEHAVIOUR CATEGORY
+  group_by(ObsRef, AnimalID, Category7) %>% 
+  mutate(Count_Category = sum(Count)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  select(-Count,-Behaviour, -Proportion) %>% 
+  distinct() %>% 
+  mutate(Proportion_Category = Count_Category/TotalScanNumber)
+View(ScanInst7_BySession_WithInfo)
+
+
+
+#########################################Data check/Exploration
+
+#pupcarry
+View(ScanInst_BySession %>% 
+       filter(Behaviour == "Pupcarry", 
+              Proportion > 0))
+#There is only 98 entries of pupcarry out of 233'376 entries. It is totally negligible
+
+
+#animals in group comp but for which there is no behaviour, suggesting behaviours may not have imported and/or these animals were excluded from scan
+View(ScanInst_BySession_WithInfo %>% 
+       filter(is.na(ObsRef))) 
+View(ScanInst_BySession_WithInfo %>% 
+       filter(is.na(ObsRef))%>% 
+       distinct(ObsDate,Colony,AnimalID))
+#374 animals that are missing behaviours
+#sometimes it looks like it is entire scan others just a few animals
+
+```
+
+
+###Data Visualisation 
+
+Violin plot: with 17 behaviours, with 7 categories
+Heat map
+Correlation plot
+
+```{r}
+
+######################################Violin plot
+
+######################################Heat map correlation structure
+#Not sure what it will bring 
+#An idea could be to enforce clustering by categories and see whether behavioural pattern differes from when clustering is not enforced by categories (disregarding categories)
+
+######################################Correlation plot 
+
+```
+
+
+###PCA
+
+###LDA 
+
+###Multinomial 
+
+

@@ -1,0 +1,7 @@
+"column_name","qry_ScanSession_Mrdb","qry_ScanSession_MrRaw","qry_ScanSession_All"
+"ContinuousDuration","integer","numeric","numeric"
+"ExptRef","integer","character","integer"
+"ObserverRef","integer","character","character"
+"ScanFileID","character","integer","integer"
+"TotalDuration","integer","numeric","numeric"
+"TotalScanNumber","integer","numeric","numeric"

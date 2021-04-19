@@ -1,0 +1,253 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r package}
+
+rm(list = ls())
+
+#Data tidying
+library(tidyverse)
+
+```
+
+
+#Info and functions
+```{r data and functions}
+
+#extract relevant info from database
+#don't run the new behaviour import if not necessary because it takes for ages
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/Database_Extract_20210305.R")
+
+#Load relevant functions
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/DMRfunctions_20210305.R")
+
+#Prepare most relevant data
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/DataPreparation_20210305.R")
+
+```
+
+#Data preparation
+
+##Animal Info
+Query all informations of animals that were observed within the frame of focal observations. A better alternative may be to query information on entire group compositions if I end up needing info on group comp for example. This will most likely depend from type of analyses
+
+```{r Focal ID List}
+
+####################################Possibly observed animals
+#based on group composition queried from colony and date entered as independent variable qry_FocalSession_All
+
+#Observation date 
+Focal_ColonyDate <- qry_FocalSession_All %>% 
+  distinct(Colony,FocalDate)
+
+#Query group composition using groupID recorded as independent variable in Observer
+#Do I need to add MemberFrom and MemberTo here?
+Focal_GroupComp_Queried <- groupcomp(DF1 = Focal_ColonyDate, Date = FocalDate)
+View(Focal_GroupComp_Queried)
+
+
+####################################Effectively Observed animals
+#Colony is the one from qry_FocalSession_All
+
+#Focal ID
+Focal_FocalID <- FocalRaw_Dyads_Cleaned %>% 
+  distinct(FocalDate,Colony,AnimalID) %>% 
+  filter(!(is.na(AnimalID))) %>% 
+  mutate(AnimalType = "Focal") %>%
+  arrange(AnimalID,FocalDate)
+View(Focal_FocalID)
+#6251
+
+#Partner ID
+Focal_PartnerID <- FocalRaw_Dyads_Cleaned %>% 
+  distinct(FocalDate,Colony,PartnerID) %>% 
+  rename(AnimalID = PartnerID) %>% 
+  mutate(AnimalType = "Partner") 
+View(Focal_PartnerID)
+#18349
+
+#All Observed animals 
+#Merge FocalID and PartnerID
+Focal_AnimalList_Observed <-  bind_rows(Focal_FocalID,Focal_PartnerID) %>%
+  select(-AnimalType) %>% 
+  distinct()
+View(Focal_AnimalList_Observed)
+#20'774 unique combination of AnimalID and dates
+
+```
+
+Get static information on each animal that was observed in the course of focal observations. At this stage, I have only done it for observed animals.
+
+```{r Static}
+Focal_ObservedAnimals_Static <- Focal_AnimalList_Observed %>%
+  distinct(AnimalID) %>% 
+  idinfo_static()
+View(Focal_ObservedAnimals_Static)
+#926 animals were observed
+
+```
+
+Get dynamic information on each animal that was observed in the course of focal observations
+```{r Dynamic}
+#Needs to start with a list of AnimalID and dates
+
+#Get a list of dates of interest, AnimalID and static info 
+#Should have 13'572 rows
+Focal_ObservedAnimals_Dates <- Focal_AnimalList_Observed %>%
+  select(AnimalID,FocalDate) %>% 
+  left_join(.,Focal_ObservedAnimals_Static)
+View(Focal_ObservedAnimals_Dates)
+#20'774 no loss of rows
+
+
+#Dynamic info
+#Age <- age_inmonths()
+#Breeding Status <- breedingstatus 
+#Gestation status <- gestationstatus() breeding status after last parturition
+#weight <- closestweight()
+Focal_AnimalID_Dynamic <- Focal_ObservedAnimals_Dates %>%
+  age_inmonths(Date = FocalDate) %>% 
+  breedingstatus(Date = FocalDate) %>% 
+  left_join(.,gestationstatus(DF = Focal_ObservedAnimals_Dates,Date = FocalDate)) %>% 
+  distinct() %>% ##from 20'774 to 20'784 (no distinct) and 20'758 if distinct. Not sure why it creates a duplication 
+  left_join(.,closestweight(DF1 = Focal_ObservedAnimals_Dates %>% 
+                              select(AnimalID,FocalDate), DF2 = tblWeights, Date = FocalDate))
+```
+
+
+##Group info
+At this stage I am not sure if and what group info may be needed. It will depend on analyses. For example do ERGM need individual info on each individual at a given date of observation or not? 
+
+
+##Behaviours
+
+The membership of Partner ID is needed to exclude interactions that may have been impossible. 
+
+For each behaviour, I will have to generate a count of interaction they have been part of. I must have previously done it with Colin. Go and find the code on how it was done.
+
+```{r Focal Membership}
+
+####################################Queried membership
+#Membership will return double entry if date correspond to a date of change
+
+#All Observed animals membership
+Focal_FocalPartnerID_Membership <- Focal_AnimalList_Observed %>% 
+  select(AnimalID,FocalDate,AnimalType) %>% 
+  membership(Date = FocalDate) %>% 
+  rename(QueriedColony = Colony)
+View(Focal_FocalPartnerID_Membership)
+
+
+#FocalID queried membership
+#includes HBO2 animals
+Focal_FocalID_Membership <- Focal_FocalID %>% 
+  select(AnimalID,FocalDate,AnimalType) %>% 
+  membership(Date = FocalDate) %>% 
+  rename(QueriedColony = Colony)
+View(Focal_FocalID_Membership)
+
+
+#PartnerID queried membership  
+Focal_PartnerID_Membership <- Focal_PartnerID %>% 
+  select(AnimalID,FocalDate,AnimalType) %>% 
+  membership(Date = FocalDate) %>% 
+  rename(QueriedColony = Colony)
+View(Focal_PartnerID_Membership)
+
+```
+
+```{r Dyads}
+
+#FocalRaw_Dyads_Cleaned from data prep file
+#Remove interactions where partnerID has a queried colony that differ from Colony entered as an independent variable in FocalSession
+Dyads <- FocalRaw_Dyads_Cleaned %>%
+  filter(ExpName != "HBO2") %>% #For network analyses these can be excluded
+  inner_join(.,Focal_FocalPartnerID_Membership %>% 
+              select(AnimalID,FocalDate,QueriedColony),by=c("PartnerID" = "AnimalID","FocalDate" = "FocalDate")) %>% 
+  distinct() %>% 
+  filter(Colony == QueriedColony)#Only retain interactions where colony as independent variable is the same is Queried colony of Partner ID 
+
+```
+
+
+###Submissive calls
+
+```{r data prep}
+#select sub calls
+#shape for further analyses
+SubCall <- Dyads %>% 
+  filter(Behaviour == "Submiss call") %>% 
+  select(DataSource,FocalRef,FocalDate,StartTime,EventTime,Behaviour,Colony,AnimalID,PartnerID,ReceivedValue,InteractionRef)
+
+#received submissive call
+SubCall_R <- SubCall %>% 
+  filter(ReceivedValue == 0) %>% 
+  rename(WinnerID = AnimalID,
+         LoserID = PartnerID) %>% 
+  select(-ReceivedValue)
+
+#Given submissive call
+SubCall_G <- SubCall %>% 
+  filter(ReceivedValue == 1) %>% 
+  rename(WinnerID = PartnerID,
+         LoserID = AnimalID) %>% 
+  select(-ReceivedValue)
+
+#Merge received and given value 
+SubCall_EloDF <- bind_rows(SubCall_R,SubCall_G) %>% 
+  arrange(Colony,FocalDate,StartTime,EventTime)#check whether that is going to give me the same sequence
+View(SubCall_EloDF)
+
+write.csv(SubCall_EloDF,"SubCall_EloDF_20210803.csv",row.names = FALSE)
+```
+
+
+###Pass
+So far I have excluded sidewards pass but they could be used as null outcome
+```{r data prep}
+
+#select sub calls
+#shape for further analyses
+Pass_Front <- Dyads %>% 
+  filter(Behaviour == "Pass",
+         ModifierLabel2 == "NoseToNose") %>% 
+  select(DataSource,FocalRef,FocalDate,StartTime,EventTime,Behaviour,Colony,AnimalID,PartnerID,ModifierLabel3,InteractionRef)
+View(Pass_Front)
+
+#received submissive call
+PassOver <- Pass_Front %>% 
+  filter(ModifierLabel3 == "Over") %>% 
+  rename(WinnerID = AnimalID,
+         LoserID = PartnerID)
+View(PassOver)
+
+#Given submissive call
+PassUnder <- Pass_Front %>% 
+  filter(ModifierLabel3 == "Under") %>% 
+  rename(WinnerID = PartnerID,
+         LoserID = AnimalID)
+View(PassUnder)
+
+#Merge received and given value 
+Pass_EloDF <- bind_rows(PassOver,PassUnder) %>% 
+  arrange(Colony,FocalDate,StartTime,EventTime)#check whether that is going to give me the same sequence
+View(Pass_EloDF)
+
+write.csv(SubCall_EloDF,"Pass_EloDF_20210803.csv",row.names = FALSE)
+
+```
+
+#Analyses 
+I will have to join behaviour info on animal info. Based on analyses, I will use winner/loser or Focal/Partner to join. Since I am not sure yet, I have not done it
+
+##Elo calculation
+
+###Sub Call 
+
+
+###Pass

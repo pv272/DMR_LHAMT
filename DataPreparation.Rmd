@@ -1,0 +1,302 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r load package}
+
+library(tidyverse)
+
+```
+
+
+#Behavioural Data
+
+```{r get data}
+
+#Instant and cont behaviours grouped by day of observation
+#comes from DataPreparation_Scan file
+Scan <- Scan_Session_Data_Day %>% 
+  rename(AnimalID = Subject)
+
+#Point and state by session 
+Focal_SessionSummary <- 
+  
+Focal_DaySummary <- 
+  
+  
+
+```
+
+
+##Scan 
+
+```{r Subset}
+
+#BS experimental data 
+
+#Are there any experimental data we may want remove
+
+```
+
+##Focal 
+
+
+#Individual Info
+I wonder whether that should be also part of a pipeline. The data prep of each project would then simply be to subset the data
+
+##Static
+```{r List}
+
+############################################Scan 
+#Animal Observed during scan
+Subject_Scan <- Scan %>% 
+  distinct(AnimalID)
+View(List_Subject_Scan)
+#1127 animals observed
+
+############################################Focal
+
+
+############################################Merge Scan & Focal
+
+```
+
+```{r Static}
+Static <- idinfo_static(Subject_Scan)
+```
+
+## Dynamic
+
+Dynamic info I will be interested in 
+- Age 
+- Weight 
+- Breeding status: animal considered as breeder if already gave birth in the lab.
+- Gestation status: could be done at a later stage as it will depend on analyses
+
+```{r List}
+
+############################################Scan 
+#Observed Animal/Date combination during scan
+SubjectDate_Scan <- Scan %>% 
+  distinct(AnimalID,ObsDate)
+View(List_SubjectDate_Scan)
+#18989 combinations
+
+#Observed Animal/Date combination during scan + static info
+#Will serve to get dynamic info
+SubjectDateStatic_Scan <- List_SubjectDate_Scan %>% 
+  left_join(.,Static)
+
+############################################Focal 
+
+
+############################################Merge
+
+```
+
+Age, breeding status and weight can be queried quite easily from the static information. They could wither be piped in Static or queried separately with stand alone function. 
+Gestation and lactation status are more difficult and may require group characteristics
+```{r Dynamic}
+
+#######################################Weight
+#Closest weight
+#1 weight for animal/date
+ClosestWeight <- SubjectDate_Scan %>% 
+  closestweight(Date = ObsDate)
+View(ClosestWeight)
+
+#######################################Age
+#Age
+#1 age per animal/date
+Age <- SubjectDateStatic_Scan %>% 
+  select(AnimalID,ObsDate,BirthDate) %>% 
+  add_age(date = ObsDate, unit = "months") %>% 
+  add_age(date = ObsDate, unit = "days")
+View(Age)
+
+
+#######################################Breeding status 
+#Breeding Status
+#1 row per animal/date
+BreedingStatus <- SubjectDateStatic_Scan %>% 
+  select(AnimalID,ObsDate,Sex,FirstConceptionDate) %>% 
+  add_breedingstatus(date = ObsDate, firstconceptiondate = FirstConceptionDate)
+View(BreedingStatus)
+
+View(BreedingStatus %>% 
+       filter(Sex == "F",
+              BreedingStatus == ))
+
+
+#######################################Next Parturition
+#Delay til Next parturition with dates
+#1 row for each breeding female/date when ObsDate > FirstConception AND ObsDate < Parturition
+NextParturition <- 
+  #FUNCTION DATA
+  #RETAIN FEMALE THAT BRED
+  SubjectDateStatic_Scan %>%
+  filter(Sex == "F",
+         !(is.na(FirstConceptionDate))) %>%
+  select(AnimalID,ObsDate,FirstParturitionDate) %>% 
+  #NEXT PARTURITION ()
+  next_parturitioninfo(., date = ObsDate) %>% 
+  #SELECT 
+  select(AnimalID,ObsDate,Next_ParturitionDate,Next_ParturitionDayDiff)
+View(NextParturition)
+#1660
+#2618
+
+#######################################GestationStatus
+#at the moment the function does not deal with the undetermined period
+
+#Semester
+GestationStatus_Semester <-   SubjectDateStatic_Scan %>%
+  #FUNCTION DATA
+  #RETAIN FEMALE THAT BRED
+  filter(Sex == "F",
+         !(is.na(FirstConceptionDate))) %>% 
+  select(AnimalID, ObsDate, DeathDate, FirstParturitionDate, LastParturitionDate) %>% 
+  #ADD DAYDIFF TO NEXT PARTURITION
+  left_join(.,NextParturition) %>% 
+  mutate(BreedingTenure_EndDate = case_when(!(is.na(DeathDate)) ~ DeathDate, 
+                                              TRUE ~ today())) %>%
+  gestationstatus(date = ObsDate,gestationsplit = "semester") %>% 
+  arrange(AnimalID)
+View(GestationStatus_Semester)
+
+#Trimester
+GestationStatus_Trimester <-   SubjectDateStatic_Scan %>%
+  #FUNCTION DATA
+  #RETAIN FEMALE THAT BRED
+  filter(Sex == "F",
+         !(is.na(FirstConceptionDate))) %>% 
+  select(AnimalID, ObsDate, DeathDate, FirstParturitionDate, LastParturitionDate) %>% 
+  #ADD DAYDIFF TO NEXT PARTURITION
+  left_join(.,NextParturition) %>% 
+  mutate(BreedingTenure_EndDate = case_when(!(is.na(DeathDate)) ~ DeathDate, 
+                                              TRUE ~ today())) %>%
+  gestationstatus(date = ObsDate,gestationsplit = "trimester") %>% 
+  arrange(AnimalID)
+View(GestationStatus_Trimester)
+ 
+
+
+View(GestationStatus)
+   
+  
+  
+  
+  
+  
+    #ADD STARTDATE UNDETERMINED PERIOD 
+    mutate(Gestation_Undetermined_StartDate = case_when(BreedingTenure_EndDate - 90 >= LastParturitionDate ~ BreedingTenure_EndDate - 90,
+           BreedingTenure_EndDate - 90 < LastParturitionDate ~ LastParturitionDate)) %>% 
+  
+          mutate(GestationStatus_Trimester = case_when(Next_ParturitionDayDiff < -90  ~ "NotPregnant", 
+                                           Next_ParturitionDayDiff >= - 90 & Next_ParturitionDayDiff < -(90/2) ~ "FirstSemester",
+                                           Next_ParturitionDayDiff >= -(90/2) & Next_ParturitionDayDiff <=0 ~ "SecondSemester",
+                                           is.na(Next_ParturitionDayDiff) & ObsDate >= Gestation_Undetermined_StartDate ~"Undetermined"))
+
+View(poo)
+#2810
+  
+
+
+
+
+List_SubjectDateStatic_Scan %>% 
+  select(AnimalID,ObsDate,FirstConceptionDate)mutate(BreedingTenure_EndDate = case_when(!(is.na(DeathDate)) ~ DeathDate, 
+                                              TRUE ~ today())) %>% 
+    #ADD STARTDATE UNDETERMINED PERIOD 
+    mutate(Gestation_Un
+
+
+
+
+
+########################################Join all dynamic data
+
+# #all dynamic info
+# Dynamic <- List_SubjectDate_Scan %>% 
+#   #ADD STATIC
+#   left_join(.,Static) %>% 
+#   select(AnimalID,ObsDate,BirthDate,FirstConceptionDate,Queen) %>% 
+#   #ADD AGE
+#   add_age(date = ObsDate, unit = "months") %>% 
+#   add_age(date = ObsDate, unit = "days") %>% 
+#   #ADD WEIGHT
+#   left_join(.,ClosestWeight) %>% 
+#   #ADD BREEDING STATUS
+#   add_breedingstatus(date = ObsDate)
+#   
+# 
+# 
+#   left_join(.,gestationstatus(DF = AnimalID_Static_FocalDates)) %>% 
+# 
+# View(Dynamic)
+
+```
+
+#Group Info
+- Group size 
+- Pup presence 
+- Pup number 
+- Pup age 
+- Breeding status of group (through data prep)
+
+```{r list}
+
+#List of group and dates
+List_GroupDate_Scan <- Scan %>% 
+  distinct(Colony,ObsDate)
+View(List_GroupDate_Scan)
+#2324
+
+```
+
+```{r Group comp}
+
+#Get group comp 
+GroupComp_Scan <- groupcomp(List_GroupDate_Scan, Date = ObsDate)
+View(GroupComp_Scan)
+```
+
+```{r Static}
+
+#Static info of group comp 
+GroupComp_Static_Scan <- GroupComp_Scan %>% 
+  left_join(.,Animal_Info)
+View(GroupComp_Static_Scan)
+#27'03
+```
+
+```{r Dynamic}
+
+#Age
+
+#Weight 
+
+#BreedingStatus
+
+```
+
+```{r Group}
+
+#####################################Group Size 
+#GroupSize
+GroupSize <- groupsize(GroupComp_Scan, Date = ObsDate)
+View(GroupSize_Scan)
+#2'319 loss of 5 rows
+
+#Number of pups 
+PupNumber <- 
+
+#Age of pups 
+
+#Number of pups 
+
+#breeding status 
+
+```
+

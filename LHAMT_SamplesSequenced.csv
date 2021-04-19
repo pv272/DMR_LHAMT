@@ -1,0 +1,193 @@
+,AnimalID,Sex,BreedingStatus,SampleID,ng/ul,Round,Bioanalyzer?,Number,Analyse,KZ_To_Process?,Process from questionable,BrainRegion,Slide,Slice,PunchSize,PunchNb,Punch_Time,Punch,Crack,Amount,Transfer,Location,Consistency,PictureID,Confidence,Comments
+1,N0F009,Female,Breeder,623,2.32,1,,1,,Yes,Yes,AMY,7,3,0.5,1,,Wet,NA,NA,YES,0,0,,NA,
+2,MAF008,Female,Helper,922,2.07,1,,2,,Yes,Yes,AMY,9,1,0.5,1,,Yes,NA,NA,,0,1+,,NA,not lateral enough?
+3,G1F025,Female,Solitary,132,4.49,1,,3,Yes,Yes,,AMY,5,3,0.5,1,11:30,,YES,increased,YES,2,NA,No,NA,Should have been punched at slide 5 slice 2 
+4,GRF002,Female,Solitary,149,1.73,1,yes,4,Yes,Yes,,AMY,5,2,0.5,1,13:31,,NA,YES,YES,2,,No,NA,Gap between punch and fibre 
+5,MAF003,Female,Solitary,166,3.28,1,,5,Yes,Yes,,AMY,5,2,0.5,1,12:32,,NO,YES,YES,2,,No,NA,Punched on this slice to stay consistent with VMH
+6,N0M003,Male,Breeder,185,1.85,1,,6,Yes,Yes,,AMY,6,3,0.5,1,20:34,,NO,YES,YES,2,,No,NA,Perhaps a bit too lateral
+7,DAM009,Male,Helper,219,2.79,1,,7,Yes,Yes,,AMY,6,3,0.5,1,,,NO,-1,YES,2,,No,NA,
+8,DAM007,Male,Breeder,235,2.28,1,,8,Yes,Yes,,AMY,5,3,0.5,,,,NO,YES,YES,2,,No,NA,
+9,T1F003,Female,Breeder,256,2.06,1,,9,Yes,Yes,,AMY,5,3,0.5,1,21:07,,,-1,YES,1,,No,NA,
+10,G3M015,Male,Helper,281,2.35,1,,10,,Yes,,AMY,6,4,0.5,1,11:52,,NO,-1,YES,2,,No,NA,See comment above 
+11,G3M014,Male,Breeder,301,2.09,1,,11,Yes,Yes,,AMY,5,2,0.5,1,12:46,,NO,YES,YES,2,,No,NA,
+12,G3M020,Male,Breeder,319,2.23,1,,12,Yes,Yes,,AMY,7,2,0.5,1,17:46,,NO,-1,YES,1,,No,NA,Slipped when punched
+13,G3M022,Male,Helper,341,2.48,1,,13,,Yes,,AMY,6,2,0.5,1,23:30,,NO,YES,YES,2,,No,NA,
+14,T1F008,Female,Helper,365,2.04,1,,14,,Yes,,AMY,8,2,0.5,1,15:08,,NO,YES,YES,,,No,NA,
+15,GRF004,Female,Breeder,380,1.57,1,,15,No,Yes,,AMY,9,2,0.5,1,20:54,,NO,YES,YES,1,,No,NA,
+16,GRF004,Female,Breeder,385,4.02,1,,16,Yes,Yes,,AMY,10,1,0.5,1,21:00,,NO,YES,YES,1,,No,NA,Fibre completely joined (see hardcopy);
+17,GRF003,Female,Helper,400,3.04,2,,1,Yes,Yes,,AMY,9,1,0.5,1,23:46,,NO,YES,YES,1,,No,NA,
+18,G10F023,Female,Helper,423,3.18,2,,2,,Yes,,AMY,9,2,0.5,,,,YES,YES,YES,1,,Yes,NA,No clue whether right slice; just to try 3 slices after aca merges 
+19,WEF001,Female,Solitary,481b,2.56,2,,3,Yes,Yes,,AMY,,,0.5,,,Overlap with 481,NA,NA,,,,Yes,NA,Tried to collect more latterally than 481 but overlapped 
+20,DAM001,Male,Helper,520,2.08,2,,4,,Yes,,AMY,9,1,0.5,1,,NA,YES,1,YES,1,1+,Yes,NA,
+21,DAM002,Male,Breeder,553,5.04,2,,5,,Yes,,AMY,9,1,0.5,1,19:17,NA,NO,YES,YES,1,0,Yes,NA,a bit too central
+22,LAF007,Female,Breeder,568,2.28,2,,6,,Yes,,AMY,6,3,0.5,1,20:35,Yes,NA,NA,YES,,0,Yes,NA,
+23,GRF007,Female,Helper,588,3.94,2,,7,,Yes,,AMY,7,1,0.5,1,,No,NA,NA,YES,1,1+,Yes,NA,Looks good; took picture of 7/2 as well; punch wet
+24,GRF001,Female,Breeder,605,4.16,2,,8,,Yes,,AMY,7,2,0.5,1,,Yes,NA,NA,YES,1,0,,NA,
+25,RAM001,Male,Breeder,650,2.19,2,,9,,Yes,,AMY,8,1,0.5,1,19:38,Yes,NA,NA,YES,1,0,,NA,
+26,LAM005,Male,Breeder,731,3.56,2,,10,,Yes,,AMY,7,3,0.5,1,01:57,Yes,NA,NA,YES,1,0,Yes,NA,
+27,LAM004,Male,Helper,749,2.3,2,,11,,Yes,,AMY,8,1,0.5,1,,Yes,NA,NA,YES,1,1,,NA,
+28,LAF008,Female,Helper,770,4,2,,12,,Yes,,AMY,9,1,0.5,1,,Yes,NA,NA,YES,1,1+,,NA,
+29,DVF008,Female,Helper,793,2.22,2,,13,,Yes,,AMY,8,1,0.5,1,,Wet,NA,NA,YES,1,1+,,NA,Looks good 
+30,TSM006,Male,Breeder,813,1.4,2,yes,14,,Yes,,AMY,8,1,0.5,1,13:18,Yes,NA,NA,YES,1,1+,,NA,
+31,DVF007,Female,Breeder,833,2.07,2,,15,,Yes,,AMY,8,1,0.5,1,15:57,Yes,NA,NA,-1,1,1+,,NA,Not sure I should analyze
+32,G1M026,Male,Breeder,855,2.87,2,,16,,Yes,,AMY,9,1,0.5,1,,Yes,NA,NA,YES,1,1+,,NA,
+33,TSM005,Male,Helper,874,2.69,3,,1,,Yes,,AMY,8,2,0.5,1,20:38,Slipped ,NA,NA,YES,1,1+,,NA,Because of slip may have taken other region
+34,MAF006,Female,Breeder,901,1.97,3,,2,,Yes,,AMY,7,1,0.5,1,,Yes,NA,NA,YES,1,0,,NA,
+35,TSM039,Male,Helper,981,2.26,3,,3,,Yes,,AMY,9,1,0.5,1,,Yes,NA,NA,YES,1,1+,,NA,
+36,TSM038,Male,Breeder,996,2.34,3,,4,,Yes,,AMY,9,1,0.5,1,13:02,Yes,NA,NA,YES,2,0,,NA,Higher than usual
+37,CRF007,Female,Breeder,1017,2.28,3,Yes,5,,Yes,,AMY,6,3,0.5,1,,Cracked,NA,NA,YES,,,,NA,
+38,L2F010,Female,Helper,19,2.97,3,,6,Yes,Yes,,AMY,8,1,0.5,1,16:46,,NA,NA,NA,NA,NA,No,2,punch perhaps too lateral
+39,BEF001,Female,Helper,34,2.58,3,,7,Yes,Yes,,AMY,7,4,0.5,1,22:17,,NA,NA,NA,NA,NA,No,2,Punch too lateral; refer to drawing on hardcopy 
+40,GRF005,Female,Solitary,50,3.96,3,,8,,Yes,,AMY,5,4,0.5,1,,,NA,NA,NA,NA,NA,No,,Punch where there was space left; no decision on which sample to analyse
+41,T1F005,Female,Solitary,65,2.06,3,,9,Yes,Yes,,AMY,5,3,0.5,1,12:36,,NA,NA,NA,NA,NA,No,,Analyse=yes because first slice where fibre is seen to go down ventrally
+42,G4F020,Female,Solitary,93,2.74,3,,10,,Yes,,AMY,4,4,0.5,1,,,NA,NA,NA,NA,NA,No,3,Punch location does not look too bad but I generally doubt VMH and MeAMY
+43,G10F025,Female,Solitary,100,2.8,3,,11,Yes,Yes,,AMY,4,3,0.5,1,18:57,,NA,NA,NA,NA,NA,No,3,First slice where IC touches ventral side
+44,L2F010,Female,Helper,22,3.85,3,,12,Yes,Yes,,CA1,8,3,0.5,1,16:54,,NA,NA,NA,NA,NA,No,1,perhaps two punches taken
+45,BEF001,Female,Helper,32,1.71,3,,13,Yes,Yes,,CA1,7,4,0.5,1,22:12,,NA,NA,NA,NA,NA,No,1,Better than sample 39 because punched higher
+46,GRF005,Female,Solitary,54,3.58,3,,14,,Yes,,CA1,6,1,0.5,2,12:19,,NA,NA,NA,NA,NA,No,,If one sample to be selected should perhaps be 54 because two punches were taken 
+47,T1F005,Female,Solitary,68,2.96,3,,15,Yes,Yes,,CA1,6,2,0.5,2,12:43,,NA,NA,NA,NA,NA,No,1,
+48,G4F020,Female,Solitary,83,2.4,3,,16,Yes,Yes,,CA1,4,4,0.5,,,,NA,NA,NA,NA,NA,No,2,Position looks good;
+49,G10F025,Female,Solitary,95,2.36,4,,1,Yes,Yes,,CA1,4,1,0.5,2,18:42,,NA,NA,NA,NA,NA,No,1,
+50,L2F009,Female,Helper,117,3.19,4,,2,Yes,Yes,,CA1,5,1,0.5,2,,,No,YES,YES,1,,No,NA,
+51,G1F025,Female,Solitary,128,3.94,4,,3,Yes,Yes,,CA1,4,2,0.5,2,,,NA,YES,YES,1,1,No,NA,Punch one slide after what I wanted
+52,GRF002,Female,Solitary,146,3.53,4,,4,Yes,Yes,,CA1,5,2,0.5,2,13:27,,NA,YES,YES,1,YES,No,NA,
+53,MAF003,Female,Solitary,167,3.54,4,,5,Yes,Yes,,CA1,5,3,0.5,2,13:34,,NO,,YES,2,,No,NA,Crystals on slice thus wet; punched too ventral 
+54,N0M003,Male,Breeder,181,1.88,4,,6,Yes,Yes,,CA1,6,3,0.5,2,19:32,,NO,YES,YES,1,,No,NA,
+55,DAM009,Male,Helper,221,2.06,4,,7,Yes,Yes,,CA1,7,1,0.5,2,13:58,,NO,YES,YES,1,2,No,NA,"One slice after what would have preferred, but better puncgh than sample 216"
+56,DAM007,Male,Breeder,241,2.81,4,,8,Yes,Yes,,CA1,7,1,0.5,2,18:57,,NO,YES,YES,1,,No,NA,
+57,T1F003,Female,Breeder,264,2.35,4,,9,Yes,Yes,,CA1,6,1,0.5,1,21:35,,NO,YES,YES,1,,No,NA,
+58,G3M015,Male,Helper,283,3.11,4,,10,,Yes,,CA1,7,2,0.5,2,12:01,,NO,-1,YES,1,,No,NA,Slice would have been first choice 
+59,G3M014,Male,Breeder,305,1.17,4,yes,11,Yes,Yes,,CA1,5,3,0.5,2,13:59,,NO,YES,YES,1,,No,NA,
+60,G3M020,Male,Breeder,322,1.32,4,,12,Yes,Yes,,CA1,7,2,0.5,2,17:50,,,,,1,1,No,NA,
+61,G3M022,Male,Helper,347,3.18,4,,13,,Yes,,CA1,7,2,0.5,2,23:55,,NO,YES,YES,1,2,No,NA,One slice to rostral 
+62,T1F008,Female,Helper,367,2.24,4,,14,,Yes,,CA1,9,1,0.5,2,15:10,,NO,YES,YES,1,,No,NA,
+63,GRF004,Female,Breeder,387,2.42,4,,15,Yes,Yes,,CA1,11,1,0.5,2,21:05,,NO,YES,YES,1,,No,NA,
+64,GRF003,Female,Helper,403,3.76,4,,16,,Yes,,CA1,9,1,0.5,2,23:49,,NO,YES,YES,1,1,No,NA,
+65,G10F023,Female,Helper,420,2.15,5,yes,1,Yes,Yes,,CA1,9,1,0.5,2,16:59,,NO,YES,YES,1,1+,No,NA,Slice of reference is 4 after first slice where hippocampus becomes visible
+66,G10F024,Female,Breeder,445,3.84,5,,2,Yes,Yes,,CA1,9,1,0.5,2,,Slipped ,NA,NA,-1,1,0,Yes,NA,
+67,G10F026,Female,Breeder,465,2.99,5,,3,Yes,Yes,,CA1,10,1,0.5,2,,Did not stick ,NA,NA,-1,1,0,Yes,NA,Shape of hippocampus looks more like consistency=+1
+68,WEF001,Female,Solitary,480,2.47,5,,4,,Yes,,CA1,8,1,0.5,2,,YES,NA,NA,YES,1,1+,Yes,NA,
+69,WEF002,Female,Helper,505,2.97,5,,5,Yes,Yes,,CA1,9,1,0.5,2,17:00,NA,NO,YES,YES,1,1+,Yes,NA,
+70,DAM001,Male,Helper,519,2.44,5,,6,,Yes,,CA1,9,1,0.5,2,19:54,NA,NO,YES,YES,,1+,No,NA,
+71,N0F007,Female,Helper,539,2.47,5,,7,Yes,Yes,,CA1,8,1,0.5,2,22:00,Yes,NA,NA,YES,1,0,No,NA,
+72,DAM002,Male,Breeder,552,3.58,5,,8,,Yes,,CA1,9,1,0.5,2,,NA,NO,YES,YES,1,0,No,NA,
+73,LAF007,Female,Breeder,570,2.43,5,,9,,Yes,,CA1,7,1,0.5,2,20:27,Yes,NA,NA,YES,2,0,,NA,A tiny bit too rostral
+74,GRF007,Female,Helper,585,3.68,5,,10,,Yes,,CA1,6,4,0.5,2,22:11,Yes,NA,NA,YES,,0,,NA,
+75,GRF001,Female,Breeder,604,2.79,5,,11,,Yes,,CA1,7,2,0.5,2,23:20,Yes,NA,NA,YES,1,0,,NA,
+76,N0F009,Female,Breeder,622,3.23,5,,12,,Yes,,CA1,7,3,0.5,2,00:31,Yes,NA,NA,YES,1,0,,NA,
+77,RAM001,Male,Breeder,644,2.83,5,,13,,Yes,,CA1,8,1,0.5,2,19:24,Yes,NA,NA,YES,1,0,,NA,
+78,RAM002,Male,Helper,665,3.3,5,,14,,Yes,,CA1,6,3,0.5,2,,Yes,NA,NA,,,0,,NA,
+79,WAF014,Female,Breeder,687,2.57,5,,15,Yes,Yes,,CA1,9,1,0.5,2,22:34,Wet,NA,NA,YES,1,0,,NA,
+80,WAF011,Female,Helper,706,3.72,5,,16,,Yes,,CA1,9,1,0.5,2,00:02,Yes,NA,NA,YES,1,0,,NA,
+81,WAF011,Female,Helper,708,3.55,6,,1,,Yes,,CA1,10,1,0.5,2,00:06,Yes,NA,NA,YES,1,1+,,NA,
+82,LAM005,Male,Breeder,726,5.13,6,,2,,Yes,,CA1,8,2,0.5,2,,Yes,NA,NA,-1,1,0,Yes,NA,
+83,LAM004,Male,Helper,746,3.84,6,,3,,Yes,,CA1,7,3,0.5,2,19:52,Yes,NA,NA,YES,2,0,,NA,Second punch too ventral 
+84,LAF008,Female,Helper,762,3.76,6,,4,,Yes,,CA1,9,1,0.5,2,,Yes,NA,NA,YES,1,0,,NA,
+85,DVF008,Female,Helper,792,3.32,6,,5,,Yes,,CA1,8,1,0.5,2,,Yes,NA,NA,YES,1,4-5.,,NA,
+86,TSM006,Male,Breeder,810,6.15,6,,6,,Yes,,CA1,8,1,0.5,2,13:13,Yes,NA,NA,YES,1,,,NA,
+87,DVF007,Female,Breeder,830,3.06,6,,7,,Yes,,CA1,8,1,0.5,2,15:53,Yes,NA,NA,YES,2,0,,NA,slightly too high
+88,G1M026,Male,Breeder,850,4.29,6,,8,,Yes,,CA1,8,1,0.5,2,17:49,Yes,NA,NA,YES,1,0,,NA,
+89,TSM005,Male,Helper,868,2.91,6,,9,,Yes,,CA1,8,3,0.5,2,20:30,Yes,NA,NA,YES,1,0,,NA,
+90,MAF006,Female,Breeder,900,3.41,6,,10,,Yes,,CA1,7,2,0.5,2,,,NA,NA,YES,1,0,,NA,
+91,MAF008,Female,Helper,919,4.1,6,,11,Yes,Yes,,CA1,9,1,0.5,2,02:21,Yes,NA,NA,YES,1,,,NA,
+92,CRF002,Female,Helper,937,3.33,6,,12,,Yes,,CA1,8,1,0.5,2,19:13,,NA,NA,YES,1,0,,NA,
+93,G1M024,Male,Helper,958,4.6,6,,13,,Yes,,CA1,9,1,0.5,2,20:04,,NA,NA,,,,,NA,
+94,TSM039,Male,Helper,979,3.74,6,,14,,Yes,,CA1,9,1,0.5,2,,Yes,NA,NA,YES,1,1+,,NA,
+95,TSM038,Male,Breeder,995,2.37,6,yes,15,,Yes,,CA1,9,1,0.5,2,13:00,Scratch ,NA,NA,YES,YES,0,,NA,
+96,CRF007,Female,Breeder,1010,3.54,6,,16,,Yes,,CA1,7,1,0.5,2,12:53,,NA,NA,YES,1,0,,NA,
+97,GRF005,Female,Solitary,49,5.05,7,,1,,Yes,,CA3,5,4,0.5,1,,,NA,NA,NA,NA,NA,No,,
+98,T1F005,Female,Solitary,69,5.01,7,,2,,Yes,,CA3,6,2,0.5,2,12:44,,NA,NA,NA,NA,NA,No,2,
+99,G4F020,Female,Solitary,82,4.05,7,,3,Yes,Yes,,CA3,4,4,0.5,,,,NA,NA,NA,NA,NA,No,2,Punch location looks good;
+100,G10F025,Female,Solitary,96,6.01,7,yes,4,Yes,Yes,,CA3,4,1,0.5,2,18:48,,NA,NA,NA,NA,NA,No,1,
+101,G1F025,Female,Solitary,129,4.79,7,,5,Yes,Yes,,CA3,4,2,0.5,2,,,NA,YES,YES,2,NA,No,NA,Punch a bit too central
+102,MAF003,Female,Solitary,168,3.13,7,,6,Yes,Yes,,CA3,5,3,0.5,2,13:35,,NO,,YES,1,,No,NA,Punch wet; crystal on slice; punch too caudal 
+103,N0M003,Male,Breeder,182,2.89,7,,7,Yes,Yes,,CA3,6,3,0.5,2,19:34,,NO,YES,YES,1,,No,NA,
+104,N0M004,Male,Helper,199,3.79,7,,8,No,Yes,,CA3,6,1,0.5,2,,,NO,Unknown,YES,,,No,NA,"wet, thus difficult assess amount"
+105,DAM009,Male,Helper,220,3.16,7,,9,Yes,Yes,,CA3,7,1,0.5,2,14:00,,NO,YES,YES,1.5,2,No,NA,"One slice after what would have preferred, but better puncgh than sample 214"
+106,DAM007,Male,Breeder,242,3.67,7,,10,Yes,Yes,,CA3,7,1,0.5,1,18:56,,NO,YES,YES,2,,No,NA,Not collected on 6/3 because punching issue; tried to take a second punch of CA3 but was unsucessful; HIP had a shape  that suggests that punch was too ventral; too much banana shape
+107,T1F003,Female,Breeder,265,3.46,7,,11,Yes,Yes,,CA3,6,1,0.5,1,21:34,,NO ,YES,YES,1,,No ,NA,
+108,GRF004,Female,Breeder,266,3.32,7,,12,Yes,Yes,,CA3,11,1,0.5,2,21:04,,NO,YES,YES,2,,No,NA,
+109,G3M015,Male,Helper,287,3.9,7,,13,,Yes,,CA3,7,3,0.5,2,12:08,,NO,-1,YES,1,2,No,NA,Probably too caudal in comparisson to other samples but better punch location on slice; although melted 
+110,G3M014,Male,Breeder,307,3.21,7,,14,,Yes,,CA3,6,1,0.5,3,14:04,,NO,YES,YES,2,3,No,NA,"too caudal, slipped when punched"
+111,G3M020,Male,Breeder,321,5.28,7,,15,Yes,Yes,,CA3,7,2,0.5,2,17:51,,,,,1,1,No,NA,Too dorsal
+112,G3M022,Male,Helper,346,4.09,7,,16,,Yes,,CA3,7,2,0.5,2,23:50,,NO,YES,YES,1,,No,NA,
+113,T1F008,Female,Helper,366,2.72,8,,1,,Yes,,CA3,9,1,0.5,2,15:09,,NO,YES,YES,1,,No,NA,
+114,GRF003,Female,Helper,408,4.06,8,,2,,Yes,,CA3,10,1,0.5,2,,,NO,YES,YES,2,2,No,NA,One slide too caudal
+115,G10F023,Female,Helper,419,2.79,8,,3,Yes,Yes,,CA3,9,1,0.5,2,16:58,,NO,YES,YES,1,1+,No,NA,
+116,G10F024,Female,Breeder,441,2.33,8,,4,,Yes,,CA3,8,1,0.5,2,,YES,NA,NA,YES,1,1-,Yes,NA,
+117,G10F026,Female,Breeder,462,2.74,8,,5,,Yes,,CA3,9,1,0.5,2,13:55,Did not stick ,NA,NA,-1,1,1-,Yes,NA,
+118,WEF001,Female,Solitary,479,3.17,8,,6,,Yes,,CA3,8,1,0.5,2,,YES,NA,NA,YES,2,1+,Yes,NA,Perhaps a bit too high 
+119,DAM001,Male,Helper,518,2.9,8,,7,,Yes,,CA3,9,1,0.5,2,19:52,NA,NO,YES,YES,,1+,No,NA,
+120,N0F007,Female,Helper,534,3.57,8,,8,Yes,Yes,,CA3,7,2,0.5,2,21:48,Yes,NA,NA,YES,,-1,No,NA,
+121,DAM002,Male,Breeder,556,3.64,8,,9,,Yes,,CA3,10,1,0.5,2,19:24,NA,NO,YES,YES,1,1,No,NA,
+122,LAF007,Female,Breeder,569,4.51,8,yes,10,,Yes,,CA3,7,1,0.5,2,20:26,Yes,NA,NA,YES,1,0,,NA,
+123,GRF007,Female,Helper,586,4.3,8,,11,,Yes,,CA3,7,1,0.5,2,22:15,Yes,NA,NA,YES,1,1+,Yes,NA,
+124,GRF001,Female,Breeder,603,3.69,8,,12,,Yes,,CA3,7,2,0.5,2,23:18,Yes,NA,NA,YES,1,0,,NA,
+125,N0F009,Female,Breeder,621,4.69,8,,13,,Yes,,CA3,7,3,0.5,2,00:29,Yes,NA,NA,YES,1,0,,NA,
+126,RAM001,Male,Breeder,643,4.02,8,,14,,Yes,,CA3,8,1,0.5,2,19:22,Yes,NA,NA,YES,1,0,,NA,
+127,RAM002,Male,Helper,664,3.11,8,,15,,Yes,,CA3,6,3,0.5,2,,Yes,NA,NA,,,0,,NA,
+128,WAF014,Female,Breeder,686,4.49,8,,16,Yes,Yes,,CA3,9,1,0.5,2,22:33,Wet,NA,NA,YES,1,0,,NA,
+129,WAF011,Female,Helper,705,3.57,9,,1,,Yes,,CA3,9,1,0.5,2,00:00,Yes,NA,NA,YES,1,0,,NA,
+130,LAM005,Male,Breeder,723,2.7,9,,2,,Yes,,CA3,8,1,0.5,2,,Yes,NA,NA,YES,1,-1,Yes,NA,
+131,LAM004,Male,Helper,745,4.27,9,,3,,Yes,,CA3,7,3,0.5,2,19:51,Yes,NA,NA,YES,1,0,,NA,
+132,DVF008,Female,Helper,789,2.64,9,,4,,Yes,,CA3,7,1,0.5,2,,Yes,NA,NA,YES,1,,,NA,Too lateral
+133,TSM006,Male,Breeder,809,3.65,9,,5,,Yes,,CA3,8,1,0.5,2,13:11,Yes,NA,NA,YES,1,,,NA,
+134,DVF007,Female,Breeder,829,3.48,9,,6,,Yes,,CA3,8,1,0.5,2,15:52,Yes,NA,NA,YES,1,0,,NA,
+135,G1M026,Male,Breeder,851,4.09,9,,7,,Yes,,CA3,9,1,0.5,2,17:53,Yes,NA,NA,YES,1,1+,,NA,
+136,TSM005,Male,Helper,867,3.8,9,,8,,Yes,,CA3,8,3,0.5,2,20:28,Yes,NA,NA,YES,1,0,,NA,
+137,MAF006,Female,Breeder,905,5.73,9,,9,,Yes,,CA3,8,1,0.5,2,01:12,,NA,NA,YES,1,1+,,NA,more caudal than usual
+138,MAF008,Female,Helper,918,3.16,9,,10,Yes,Yes,,CA3,9,1,0.5,2,02:20,Yes,NA,NA,YES,2,,,NA,bit too dorsal
+139,CRF002,Female,Helper,936,2.83,9,,11,,Yes,,CA3,8,1,0.5,2,19:12,,NA,NA,YES,1,0,,NA,
+140,G1M024,Male,Helper,956,5.09,9,yes,12,,Yes,,CA3,8,1,0.5,2,,Yes,NA,NA,YES,,,,NA,
+141,TSM039,Male,Helper,980,2.76,9,,13,,Yes,,CA3,9,1,0.5,2,,Yes,NA,NA,YES,1,1+,,NA,
+142,TSM038,Male,Breeder,994,3.34,9,,14,,Yes,,CA3,9,1,0.5,2,13:02,Yes,NA,NA,YES,YES,0,,NA,
+143,CRF007,Female,Breeder,1009,3.13,9,,15,,Yes,,CA3,7,1,0.5,2,12:51,,NA,NA,YES,1,0,,NA,
+144,DAM009,Male,Helper,213,3.68,9,,16,Yes,Yes,Yes,mPA,5,1,0.5,,,,NO,1,,3,,No,NA,not sure about location
+145,GRF007,Female,Helper,582,7.09,10,,1,Yes,Yes,Yes,mPA,5,1,0.5,1,22:00,Yes,NA,NA,YES,2.5,0,,NA,OCT had fallen on PA a little
+146,DVF008,Female,Helper,785,2.72,10,,2,,Yes,Yes,mPA,5,3,0.5,1,,Yes,NA,NA,YES,3,-1,,NA,too dorsal
+147,CRF007,Female,Breeder,1007,3.73,10,,3,,Yes,Yes,mPA,4,3,0.5,1,,Yes,NA,NA,YES,2.5,1+,,NA,"too lateral, aca joined on previous slice"
+148,Z3F022,Female,Helper,5,1.8,10,yes,4,,Yes,,mPA,7,1,0.5,1,,,NA,NA,NA,NA,NA,No,2,f34
+149,L2F010,Female,Helper,15,2.97,10,,5,,Yes,,mPA,6,2,0.5,1,16:37,,NA,NA,NA,NA,NA,No,1,punch perhaps a bit too lateral
+150,BEF001,Female,Helper,31,2.34,10,,6,,Yes,,mPA,6,2,0.5,,22:06,,NA,NA,NA,NA,NA,No,1,
+151,GRF005,Female,Solitary,46,3.46,10,,7,,Yes,,mPA,5,3,0.5,1,12:00,,NA,NA,NA,NA,NA,No,,Punch perhaps a bit too lateral
+152,T1F005,Female,Solitary,63,2.25,10,,8,Yes,Yes,,mPA,4,3,0.5,1,12:32,,NA,NA,NA,NA,NA,No,2,Slice possibly 4; punch collected after aca has joined
+153,G4F020,Female,Solitary,78,2.82,10,,9,Yes,Yes,,mPA,3,4,0.5,1,15:48,,NA,NA,NA,NA,NA,No,1,
+154,G10F025,Female,Solitary,89,2.15,10,,10,,Yes,,mPA,3,3,0.5,1,18:42,,NA,NA,NA,NA,NA,No,2,Too ventral; too lateral; No decision on made on which sample to analysis
+155,L2F009,Female,Helper,113,2.56,10,,11,Yes,Yes,,mPA,3,2,0.5,1,17:09,,No,YES,YES,1,,No,NA,
+156,G1F025,Female,Solitary,126,2.81,10,,12,Yes,Yes,,mPA,2,3,0.5,1,,,NA,YES,YES,2,NA,No,NA,Too lateral
+157,GRF002,Female,Solitary,145,2.85,10,,13,Yes,Yes,,mPA,4,2,0.5,1,13:21,,NA,YES,YES,1,YES,No,NA,
+158,MAF003,Female,Solitary,161,3.26,10,,14,Yes,Yes,,mPA,4,3,0.5,1,13:24,,NO,YES,YES,1,,No,NA,
+159,N0M003,Male,Breeder,180,3.02,10,,15,Yes,Yes,,mPA,4,2,0.5,1,,,NO,YES,YES,1,,No,NA,material does not stick fully to micropunch
+160,N0M004,Male,Helper,195,2.76,10,,16,Yes,Yes,,mPA,5,2,0.5,1,11:45,,NO,YES,YES,,,No,NA,
+161,DAM007,Male,Breeder,232,4.49,11,,1,Yes,Yes,,mPA,4,3,0.5,1,18:23,,YES,YES,YES,2,1,No,NA,Selected over 231 because of better consistency 
+162,T1F003,Female,Breeder,254,2.77,11,,2,Yes,Yes,,mPA,4,1,0.5,1,,,YES,YES,YES,1,,No,NA,location = 1 assuming bit of the crack was not transferred
+163,G3M014,Male,Breeder,298,2.74,11,,3,Yes,Yes,,mPA,4,2,0.5,1,12:38,,YES,YES,YES,2,,No,NA,Slightly too lateral
+164,G3M020,Male,Breeder,317,2.97,11,,4,Yes,Yes,,mPA,6,2,0.5,1,17:40,,YES,YES,YES,2,,No,NA,Not central enough. 
+165,G3M022,Male,Helper,339,2.23,11,,5,Yes,Yes,,mPA,5,2,0.5,1,,,NO,YES,YES,2,,No,NA,A bit too lateral 
+166,T1F008,Female,Helper,361,2.1,11,yes,6,Yes,Yes,,mPA,7,2,0.5,1,14:54,,NO,YES,YES,1,2,No,NA,One slice after aca joins; had to collect really close after aca joint because ventral part of brain missing 
+167,GRF003,Female,Helper,399,2.56,11,,7,Yes,Yes,,mPA,7,1,0.5,1,23:42,,YES,-1,YES,1,1,No,NA,
+168,G10F023,Female,Helper,418,2.66,11,,8,,Yes,,mPA,8,1,0.5,1,,,NO,-1,YES,1,1+,No,NA,
+169,G10F024,Female,Breeder,438,2.1,11,,9,Yes,Yes,,mPA,6,1,0.5,1,,YES,NA,NA,-1,1,0,No,NA,
+170,WEF001,Female,Solitary,477,2.36,11,,10,Yes,Yes,,mPA,7,1,0.5,1,,Crack,NA,NA,YES,,1+,No,NA,
+171,WEF002,Female,Helper,497,2.45,11,,11,Yes,Yes,,mPA,6,2,0.5,1,16:22,NA,NO,YES,YES,1,0,Yes,NA,
+172,DAM001,Male,Helper,513,3.31,11,,12,,Yes,,mPA,6,1,0.5,1,19:23,NA,NO,YES,YES,2,0,Yes,NA,Perhaps a bit too lateral
+173,DAM002,Male,Breeder,549,3.96,11,,13,Yes,Yes,,mPA,7,2,0.5,1,19:02,NA,NO,YES,YES,1,0,Yes,NA,
+174,LAF007,Female,Breeder,566,2.49,11,,14,,Yes,,mPA,6,1,0.5,1,20:22,No,NA,NA,YES,,2+,Yes,NA,"Crack, "
+175,GRF001,Female,Breeder,601,2.23,11,,15,Yes,Yes,,mPA,6,1,0.5,1,23:16,Yes,NA,NA,YES,1.5,1+,,NA,Punch cracked; most central part of brain seemed to be missing; thus tried to punch the most centrally I could but could still be off; better location than 600
+176,N0F009,Female,Breeder,620,2.44,11,,16,Yes,Yes,,mPA,6,1,0.5,1,,Crack,NA,NA,YES,1,0,,NA,
+177,RAM001,Male,Breeder,642,3.34,12,,1,,Yes,,mPA,5,4,0.5,1,19:14,Wet,NA,NA,YES,2,0,,NA,A bit too lateral 
+178,RAM002,Male,Helper,662,3.27,12,,2,Yes,Yes,,mPA,5,2,0.5,1,21:09,Yes,NA,NA,YES,1,1+,,NA,
+179,WAF014,Female,Breeder,684,4.55,12,,3,,Yes,,mPA,6,2,0.5,1,22:23,Yes,NA,NA,YES,,-1,,NA,More ventral than 683
+180,WAF011,Female,Helper,703,3.84,12,,4,,Yes,,mPA,6,1,0.5,1,23:58,Yes,NA,NA,YES,1,0,,NA,Perhaps a tiny bit too central 
+181,LAM005,Male,Breeder,720,2.92,12,,5,,Yes,,mPA,5,4,0.5,1,01:15,Yes,NA,NA,Unknown,2,,Yes,NA,
+182,LAM004,Male,Helper,744,2.84,12,,6,,Yes,,mPA,6,2,0.5,1,20:47,Yes,NA,NA,YES,1,0,,NA,Perhaps a bit lateral
+183,LAF008,Female,Helper,765,2.3,12,,7,,Yes,,mPA,6,1,0.5,1,20:39,Yes,NA,NA,YES,2,1+,,NA,More ventral than usual 
+184,TSM006,Male,Breeder,808,3.99,12,,8,,Yes,,mPA,6,1,0.5,1,13:07,Crack,NA,NA,YES,1,1+,,NA,
+185,DVF007,Female,Breeder,828,2.53,12,,9,,Yes,,mPA,6,1,0.5,1,,Yes,NA,NA,-1,1,1+,,NA,
+186,G1M026,Male,Breeder,848,3.2,12,,10,,Yes,,mPA,6,1,0.5,1,17:41,Crack,NA,NA,-1,1,1,,NA,
+187,TSM005,Male,Helper,865,4.18,12,yes,11,,Yes,,mPA,5,3,0.5,1,20:20,Yes,NA,NA,YES,1,0,,NA,
+188,MAF008,Female,Helper,916,3.23,12,,12,,Yes,,mPA,6,1,0.5,1,02:15,Yes,NA,NA,YES,1,0,,NA,
+189,CRF002,Female,Helper,934,3.15,12,,13,,Yes,,mPA,5,3,0.5,1,16:21,Yes,NA,NA,YES,1,,,NA,
+190,G1M024,Male,Helper,954,4.22,12,,14,,Yes,,mPA,6,4,0.5,1,,Yes,NA,NA,YES,2,0,,NA,perhaps a little bit too lateral
+191,TSM039,Male,Helper,974,3.57,12,,15,,Yes,,mPA,6,2,0.5,1,,Yes,NA,NA,YES,1,0,,NA,
+192,TSM038,Male,Breeder,991,3.45,12,,16,,Yes,,mPA,6,1,0.5,1,12:54,2x,NA,NA,YES,1,0,,NA,

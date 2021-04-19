@@ -1,0 +1,1235 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+The aim of this document is to prepare the data and outline the available sample size of the LHAMT Project
+
+```{r package, include=FALSE}
+
+rm(list=ls())
+
+library(tidyverse)
+library(RMySQL)
+library(lubridate)
+library(rvg)
+library(officer)
+
+```
+
+
+
+```{r DB connect, include=FALSE}
+#connect to DB, local = 1 if at project or local = 0 if AMS server  
+con<-db_connect(username = 'philippev',local=0)
+
+```
+
+
+## load data 
+
+```{r CSV}
+
+
+#Get euthanized animals
+LHAMT_Brain <- con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.Brain") %>% 
+  mutate(SacrificeDate = ymd(SacrificeDate)) %>% 
+  filter(BranUse == "RNAseq" | BranUse == "") %>% #L2M008 had empty brain use on brain table 
+  distinct()#to remove duplicated of L2M008
+View(LHAMT_Brain)
+#We have brain for RNAseq from 79 individuals
+#This include animals that should actually be dismissed from the dataset, at which point should they be discarded?
+
+#get punches
+LHAMT_Punched <- read.csv("Punches_SampleID_20200323.csv") %>% 
+  mutate(AnimalID = as.character(AnimalID)) %>%
+   mutate(AnimalID = case_when(AnimalID == "N0F009" ~ "NOF009",
+                              AnimalID == "N0M003" ~ "NOM003",
+                              AnimalID == "N0F007" ~ "NOF007",
+                              AnimalID == "N0M004" ~ "NOM004",
+                              AnimalID == "T1F003" ~ "TIF003",
+                              AnimalID == "T1F005" ~ "TIF005",
+                              AnimalID == "T1F008" ~ "TIF008",
+                              TRUE ~ AnimalID))
+View(LHAMT_Punched)
+
+
+#Get sequenced punches
+LHAMT_Sequenced <- read.csv("LHAMT_SamplesSequenced.csv") %>% 
+  rename(PunchID = SampleID) %>% 
+  mutate(AnimalID = as.character(AnimalID)) %>% 
+  mutate(AnimalID = case_when(AnimalID == "N0F009" ~ "NOF009",
+                              AnimalID == "N0M003" ~ "NOM003",
+                              AnimalID == "N0F007" ~ "NOF007",
+                              AnimalID == "N0M004" ~ "NOM004",
+                              AnimalID == "T1F003" ~ "TIF003",
+                              AnimalID == "T1F005" ~ "TIF005",
+                              AnimalID == "T1F008" ~ "TIF008",
+                              TRUE ~ AnimalID))#a few animals names were changed in the file received from Hans
+View(LHAMT_Sequenced)
+
+```
+
+
+
+```{r DB ID Info}
+
+#Euthanized animals
+LHAMT_Brain <- con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.Brain") %>% 
+  mutate(SacrificeDate = ymd(SacrificeDate)) %>% 
+  filter(BranUse == "RNAseq" | BranUse == "") %>% #L2M008 had empty brain use on brain table 
+  distinct()#to remove duplicated of L2M008
+View(LHAMT_Brain)
+#We have brain for RNAseq from 79 individuals
+#This include animals that should actually be dismissed from the dataset, at which point should they be discarded?
+
+
+##################################Individual Info
+
+
+#Membership
+Membership_Extract <- con %>%
+  dbGetQuery ("SELECT 
+    AnimalRef,
+    AnimalID,
+    DATE(MemberFrom) AS MemberFrom,
+    DATE(MemberTo) AS MemberTo,
+    MembershipBetweenV2.ColonyRef,
+    MemberDays,
+    MembershipBetweenV2.Colony,
+    tblColonyCodes.ColonyLocation
+    -- MembershipBetweenV2.CurrentPop -- Not the same as ColonyLocation, as it returns for all rows of membershipV2 where the animal currently is
+FROM
+    MoleratViews_Pending.MembershipBetweenV2
+LEFT JOIN
+    Moleratdatabase.tblColonyCodes ON MoleratViews_Pending.MembershipBetweenV2.ColonyRef = tblColonyCodes.ColonyRef
+WHERE MembershipBetweenV2.ColonyRef <> 120 
+AND MembershipBetweenV2.Colony <> 'Exported_Nigel'
+AND MembershipBetweenV2.Colony <> 'Exported_Conny'
+-- AND MembershipBetweenV2.CurrentPop = 'L'") %>% #CurrentPop indicates where the animal is and not where it was. Therefore if one wants to return groupSize in the past
+  mutate(MemberFrom=ymd(MemberFrom),MemberTo=ymd(MemberTo)) %>% 
+  select(AnimalRef,AnimalID,MemberFrom,MemberTo,Colony,ColonyLocation)
+
+
+#AnimalID
+#also give litter ref
+tblAnimalID <- con %>%
+  dbGetQuery ("SELECT * FROM Moleratdatabase.tblAnimalID")
+View(tblAnimalID)
+
+tblAnimalID_Duplicate <- tblAnimalID %>% 
+  group_by(AnimalID) %>% 
+  mutate(Duplicate = n()) %>% 
+  filter(Duplicate > 1)
+View(tblAnimalID_Duplicate)
+#No duplicate in animal ID
+
+
+#Litter Ref
+LitterRef <- tblAnimalID %>% 
+  select(AnimalID,LitterRef)
+View(LitterRef)
+
+
+#Sex
+tblSex <- con %>%
+  dbGetQuery ("SELECT * FROM Moleratdatabase.tblSex") %>% 
+  select(-RowRef)
+View(tblSex)
+
+tblSex_Duplicate <- tblSex %>% 
+  group_by(AnimalID) %>% 
+  mutate(Duplicate = n()) %>% 
+  filter(Duplicate > 1)
+View(tblSex_Duplicate)
+#No duplicate in Sex
+
+
+#Birth dates
+Birth_Dates <- con %>%
+  dbGetQuery ("SELECT * FROM MoleratViews.qry_BirthDate") %>% 
+  rename(BirthDate = LabBirthdate) %>% 
+  mutate(BirthDate = ymd(BirthDate)) %>% 
+  select(-AnimalRef)
+View(Birth_Dates)
+
+
+#First Colony 
+#For animal born in the lab this is going to be BirthColony
+FirstColony <- con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.FirstColony") %>% 
+  mutate(DateMoved = ymd(DateMoved)) %>% 
+  select(AnimalID,Colony)
+View(FirstColony)
+
+
+#All Litter
+AllLitter <- con %>%
+  dbGetQuery ("SELECT LitterRef,
+MotherID,
+DATE(DateOfBirth) AS DOB,
+Exact
+FROM Moleratdatabase.tblLitterCode") %>% 
+  mutate(DOB = ymd(DOB))
+View(AllLitter)
+#no clue why it returns an error depending on where I click on the code to run it
+
+
+#Mother First Litter
+FirstLitter_Mother<- con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.FirstLitter_Mother") %>% 
+  rename(FirstLitter_Date = Mother_FirstLitter) %>% 
+  mutate(FirstLitter_Date = ymd(FirstLitter_Date))
+names(FirstLitter_Mother)
+
+
+#Father First Litter 
+#When queried from tblLitter Ref will be sufficient to query out breeding status from LHAM and BS (more generally lab-formed group), but not wild-caught groups where I will need the parentage
+FirstLitter_Father <-   con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.FirstLitter_Father") %>% 
+  rename(FirstLitter_Date = Father_FirstLitterDate) %>% 
+  mutate(FirstLitter_Date = ymd(FirstLitter_Date))
+names(FirstLitter_Father)
+
+
+#put Father and mother first litter date on the same Dataset 
+#Query 
+FirstLitter <- bind_rows(FirstLitter_Mother %>% 
+            select(MotherID, FirstLitter_Date) %>% 
+            rename(AnimalID = MotherID, Date = FirstLitter_Date ),
+          FirstLitter_Father %>% 
+            select(FatherID,FirstLitter_Date) %>% 
+            rename(AnimalID = FatherID, Date = FirstLitter_Date )) %>% 
+  membership(.,Membership_Extract) %>% 
+  select(-ColonyLocation) %>% 
+  rename(FirstLitterDate = Date, FirstLitterColony = Colony)
+View(poop)
+
+
+
+
+
+
+#Start colony for LHAM experiment: We take group membership after 3 weeks because CF animals have been moved
+Start_Colony <- membership (AllLitter %>% 
+  select(MotherID, DOB) %>%
+  mutate(DOB = DOB + 21) %>% 
+  rename(AnimalID = MotherID, Date = DOB),Membership_Extract) %>% 
+  select(-ColonyLocation) %>% 
+  select(AnimalID,Colony) %>% 
+  rename(StartColony = Colony)
+View(Start_Colony)
+
+
+#Individual Experiment 
+#returns all experiments individuals have been part of
+Experiment_AnimalID <- con %>%
+  dbGetQuery ("SELECT * FROM user_philippev.Experiment_All_SubjectID") %>% 
+  mutate (ExperimentStart = ymd(ExperimentStart))
+
+
+#Pairing date 
+Pairing_Dates <- con %>%
+  dbGetQuery ("SELECT * FROM MR_MainData.tblPairing") %>% 
+  mutate(PairingDate=ymd(PairingDate))
+View(Pairing_Dates)
+
+
+#death dates
+Death_Dates <- con %>%
+  dbGetQuery ("SELECT * FROM MoleratViews.qry_DeathDate") %>% 
+  mutate(DeathDate = ymd(DeathDate))
+
+
+```
+
+
+``` {r DB samples}
+
+##################################Samples
+
+#Collected Plasma samples 
+Plasma_Collected <- con %>%
+    dbGetQuery ("SELECT 
+Moleratdatabase.tblAnimalID.AnimalID,
+Temp.Colony, -- return the colony the animal was part of
+Moleratdatabase.tblPlasmaSamples.PlasmaNumber AS SampleID,
+DATE (Moleratdatabase.tblPlasmaSamples.SampleDate) AS PlasmaDate,
+TIME (Moleratdatabase.tblPlasmaSamples.Time) AS PlasmaTime,
+Moleratdatabase.tblPlasmaSamples.Delay,
+Moleratdatabase.tblPlasmaSamples.Volume AS `Plasma Volume`,
+Moleratdatabase.tblExpDescript.ExpName AS PlasmaExp
+FROM Moleratdatabase.tblPlasmaSamples 
+LEFT JOIN Moleratdatabase.tblAnimalID ON Moleratdatabase.tblPlasmaSamples.AnimalID = tblAnimalID.AnimalID
+LEFT JOIN Moleratdatabase.tblExpDescript ON Moleratdatabase.tblPlasmaSamples.Experiment = tblExpDescript.ExptRef
+LEFT JOIN Moleratdatabase.tblTeloSample ON Moleratdatabase.tblPlasmaSamples.PlasmaNumber = tblTeloSample.TeloNumber
+LEFT JOIN user_philippev.ID_Characteristic ON Moleratdatabase.tblAnimalID.AnimalID = ID_Characteristic.AnimalID
+LEFT JOIN MoleratViews_Pending.`MembershipBetweenV2` AS `Temp` ON `Moleratdatabase`.`tblPlasmaSamples`.`SampleDate` BETWEEN `Temp`.`MemberFrom` AND `Temp`.`MemberTo` AND `Moleratdatabase`.`tblPlasmaSamples`.`AnimalID` = `Temp`.`AnimalID`
+WHERE Moleratdatabase.tblPlasmaSamples.PlasmaNumber IS NOT NULL
+ORDER BY Moleratdatabase.tblPlasmaSamples.PlasmaNumber") %>% 
+    mutate(PlasmaDate = ymd(PlasmaDate))
+  
+
+#Collected Urine samples
+Urine_Collected <- con %>%
+    dbGetQuery ("SELECT 
+Temp.Colony,
+Moleratdatabase.tblAnimalID.AnimalID,
+MR_MainData.tblUrineSamples.UrineNumber,
+UrineCondition.Label,
+Moleratdatabase.tblExpDescript.ExpName,
+DATE (MR_MainData.tblUrineSamples.Date) AS UrineDate,
+MR_MainData.tblUrineSamples.In,
+MR_MainData.tblUrineSamples.Out,
+TIME (MR_MainData.tblUrineSamples.Delay) AS UrineDelay,
+MR_MainData.tblUrineSamples.UrineVolumeCollected AS VolumeCollected
+FROM MR_MainData.tblUrineSamples
+LEFT JOIN Moleratdatabase.tblAnimalID ON MR_MainData.tblUrineSamples.AnimalRef = tblAnimalID.RowRef
+LEFT JOIN Moleratdatabase.tblExpDescript ON MR_MainData.tblUrineSamples.Experiment = tblExpDescript.ExptRef
+LEFT JOIN (SELECT *
+FROM Moleratdatabase.tblCodeList
+WHERE CodeRef= 'UrineCondition') AS UrineCondition ON MR_MainData.tblUrineSamples.`Condition` = UrineCondition.`Value`
+LEFT JOIN MoleratViews_Pending.`MemberShipBetween` AS `Temp` ON `MR_MainData`.`tblUrineSamples`.`Date` BETWEEN `Temp`.`MemberFrom` AND `Temp`.`MemberTo` AND `MR_MainData`.`tblUrineSamples`.`AnimalRef` = `Temp`.`AnimalRef`
+ORDER BY UrineNumber") %>% 
+  mutate(UrineDate = ymd(UrineDate))
+names(Urine_Collected)
+
+
+#Exported samples
+Samples_Exported <- con %>%
+    dbGetQuery ("SELECT * FROM user_philippev.Samples_Exported") %>% 
+  mutate(Date_Exported = ymd(Date_Exported))
+
+
+#Samples already analyzed at NPAC 
+#Should give SampleID, AnimalID, Batch, Purpose
+
+```
+
+
+```  {r DB behaviour}
+##################################Scan Behaviour
+
+#Get Scan Session Old import 
+Scan_SessionDetails_Old <- 
+   con %>%
+  dbGetQuery ("SELECT ScanRef,
+tblColonyCodes.Colony,
+DATE(StartDate) AS ObsDate,
+TotalScanNumber
+FROM Moleratdatabase.tblScanSessionDetails
+LEFT JOIN Moleratdatabase.tblColonyCodes ON Moleratdatabase.tblScanSessionDetails.ColonyRef = tblColonyCodes.ColonyRef") %>% 
+  mutate(ObsDate = ymd(ObsDate))
+View(Scan_SessionDetails_Old)
+
+#Get Scan Behaviour Instantaneous Old
+#To get all Scan Ref the animals were part of
+Scan_InstBehav_Old <- con %>%
+  dbGetQuery ("SELECT * FROM Moleratdatabase.tblScanBehaviour") %>% 
+  distinct(ScanRef,AnimalID)
+View(Scan_InstBehav_Old)
+
+
+#All individual scan dates old import
+IndividualScanDate_Old_All <- Scan_InstBehav_Old %>% 
+  left_join(.,Scan_SessionDetails_Old %>% select(ScanRef,ObsDate)) %>% 
+  distinct(AnimalID,ObsDate)#I could also get group from here
+
+View(IndividualScanDate_Old_All)
+
+
+#Get Scan Session New import 
+Scan_SessionDetails_New <- con %>%
+  dbGetQuery ("SELECT * FROM MR_RawData.qryScanFileSession") %>% 
+  rename(ObsDate = ObservationDate) %>% 
+  mutate(ObsDate = ymd(ObsDate)) %>% 
+  rename(ScanRef = ScanFileID)
+View(Scan_SessionDetails_New)
+
+#Get Scan Behaviour Instantaneous New
+#Don't rerun this code it takes forever
+#I cannot get colony from here, I would have to reun membership()
+Scan_InstBehav_New <- con %>%
+  dbGetQuery ("SELECT * FROM MR_RawData.qryScanInstantaneous") %>% 
+  distinct(Subject,ScanFileID) 
+
+Scan_InstBehav_New_II <- Scan_InstBehav_New %>% 
+  rename(AnimalID = Subject, ScanRef = ScanFileID)
+View(Scan_InstBehav_New_II)
+
+
+#All individual scan dates New import
+IndividualScanDate_New_All <- Scan_InstBehav_New_II %>% 
+  left_join(.,Scan_SessionDetails_New %>% select(ScanRef,ObsDate)) %>% 
+  distinct(AnimalID,ObsDate)
+View(IndividualScanDate_New_All)
+
+
+#Get all dates of scan observation (Old and new import)
+#It really would be best to have the group. Thus modify the codes above
+IndividualScanDate_OldNew_All <- bind_rows(IndividualScanDate_Old_All ,IndividualScanDate_New_All)
+View(IndividualScanDate_OldNew_All)
+
+
+
+##################################Focal Behaviour
+```
+
+
+##Prepare Data
+
+The LHAMT project is made of some (not all) experimental subjects originating from the LHAM experiment and non-experimental individuals
+
+We start by querying general information relevant to both LHAM subjects and non-experimental individuals euthanized within the frame of the LHAMT
+
+```{r LHAM-LHAMT AnimalID info}
+
+#LHAM individual
+#Experimental subjects
+LHAM_SubjectID <- Experiment_AnimalID %>% 
+  filter(ExpName =="LHAM") %>% #if wanted the BS, add |ExpName == "BS" 
+  distinct() %>% #to remove duplicationn of BEM021
+  filter(!(AnimalID %in% c("GMM001","CAM002","G10F026","G3M020"))) %>% #G3M020 was paired with G10F024 originally from Seregenti to form Addo, G10F026 was paired with G3M014 originally from Serengeti to form Who. These are not experimental animals but adding a pairing date later at a later stage will be useful
+  select(AnimalID, ExpName)
+View(LHAM_SubjectID)
+#75 subjects have been part of LHAM
+
+
+#Euthanized non-experimental individual
+LHAMT_NonExp_AnimalID <- LHAMT_Brain %>% 
+  distinct(AnimalID) %>% 
+  anti_join(.,LHAM_SubjectID) %>% 
+  mutate(ExpName = NA)
+View(LHAMT_NonExp_AnimalID)
+#27 non-experimental animals among the 79 euthanized animals of LHAM Tissue
+
+
+#LHAMT
+LHAMT_AnimalID <- LHAMT_Brain %>% 
+  distinct(AnimalID) %>% 
+  mutate(LHAMT_Euthanized = "Yes")
+View(LHAMT_AnimalID)
+#79 euthanized animals
+  
+
+#LHAM and LHAMT non-experimental subjects 
+LHAM_LHAMT_AnimalID <- bind_rows(LHAM_SubjectID,LHAMT_NonExp_AnimalID) %>% 
+  left_join(.,LHAMT_AnimalID) %>% 
+  mutate(LHAMT_Euthanized = replace_na(LHAMT_Euthanized, "No"))
+View(LHAM_LHAMT_AnimalID)#
+#102 individuals
+
+
+#get individual characteristics
+#get first Litter ref
+LHAM_LHAMT_AnimalInfo <- LHAM_LHAMT_AnimalID %>%
+  left_join(.,tblSex) %>% #Sex
+  left_join(.,Birth_Dates) %>% #DOB
+  left_join(.,LitterRef) %>% #LitterRef
+  left_join(.,FirstColony) %>% #BirthColony
+  left_join(.,FirstLitter) %>% #First Litter date and first litter colony
+  left_join(.,Death_Dates) %>% #DOD
+  rename(FirstColony = Colony)
+View(LHAM_LHAMT_AnimalInfo)
+names(LHAM_LHAMT_AnimalInfo)
+
+```
+
+
+We then query the informartion relevant only to LHAM subjects 
+
+```{r LHAM AnimalId specific Info}
+
+#subset general info to only LHAM animals 
+LHAM_AnimalInfo_General <- LHAM_LHAMT_AnimalInfo %>% 
+  filter(ExpName == "LHAM")
+View(LHAM_AnimalInfo_General)
+
+
+#Start Date 
+LHAM_StartDate <- Experiment_AnimalID %>% 
+  filter(ExpName =="LHAM") %>% #if wanted the BS, add |ExpName == "BS" 
+  distinct() %>% #to remove duplicationn of BEM021
+  filter(!(AnimalID %in% c("GMM001","CAM002","G10F026","G3M020"))) %>% #G3M020 was paired with G10F024 originally from Seregenti to form Addo, G10F026 was paired with G3M014 originally from Serengeti to form Who. These are not experimental animals but adding a pairing date later at a later stage will be useful
+  select(AnimalID,ExperimentStart) %>% 
+  rename(StartDate = ExperimentStart)
+View(LHAM_StartDate)
+
+
+#Get Colony in which animal started the experiment
+#For LHAM experiment we never used CF animals, but I kept the code in the way that would also work for BS where CF animals were used and StartColony does not correspond to 
+LHAM_StartColony <- membership(LHAM_AnimalInfo_General%>%
+                                 select(AnimalID,BirthDate) %>% 
+                                   rename(Date = BirthDate) %>% 
+                                   mutate(Date = Date + 20),#this is to avoid CF animals returning the colony of birth. We actually never used CF animals for LHAM. They were only used for the BS
+                                 Membership_Extract) %>% 
+  select(AnimalID,Colony) %>% 
+  rename(StartColony = Colony)
+View(LHAM_StartColony)
+
+
+#get Experimental group by querying GroupMembership 1 week after experiment start
+#1 week to make sure that we get the correct group size 
+LHAM_ExperimentalGroup <- membership(LHAM_StartDate %>% 
+  mutate(Date = StartDate + 7),
+  Membership_Extract) %>%
+  rename(ExperimentalGroup = Colony) %>% 
+  mutate(Date_W1 = Date) %>% #Date when group size was queried
+  mutate(Date = Date - 7) %>% #to get back to original start Date
+  select(AnimalID,Date,Date_W1,ExperimentalGroup) 
+View(LHAM_ExperimentalGroup)
+#Date must be kept for a join that allows to query out treatment cannot be queried
+
+
+#get the group size one week after experiment start 
+# this will be useful to assign treatment (solitary animals)
+LHAM_GroupSize <- groupcomp(LHAM_ExperimentalGroup %>% 
+                                select(ExperimentalGroup,Date_W1) %>% 
+                                rename(Colony = ExperimentalGroup, Date = Date_W1), Membership_Extract) %>% 
+  #GROUP BY COLONY, DATE
+  group_by(Colony,Date) %>% 
+  mutate(GroupSize_W1 = n()) %>% #also returns a row for 
+  ungroup() %>% 
+  #UNGROUP
+  rename(ExperimentalGroup = Colony) %>% 
+  mutate(Date = Date - 7) #to get back to Start Date 
+View(LHAM_GroupSize)
+  
+
+
+#Get Treatment
+#Based on whether animal changed group or not AND the size of the new group they were part of (group size of 1 in case of solitary)
+LHAM_SubjectID_Treatment <- LHAM_AnimalInfo_General %>% 
+  select(AnimalID,ExpName) %>% 
+  left_join(.,LHAM_StartDate) %>% 
+  left_join(.,LHAM_StartColony) %>%
+  left_join(.,LHAM_ExperimentalGroup %>% select(-Date, -Date_W1)) %>% 
+  inner_join(.,LHAM_GroupSize %>% 
+                select(-ExperimentalGroup),by=c("AnimalID" = "AnimalID", "StartDate" = "Date"  )) %>% 
+   mutate(Treatment = case_when(GroupSize_W1 == 1 ~ "Solitary",
+                                GroupSize_W1 != 1 & ExperimentalGroup != StartColony ~ "Breeder",
+                                 TRUE ~ "Helper")) %>% #add Treatment
+  select(ExpName,AnimalID,Treatment)
+View(LHAM_SubjectID_Treatment)
+
+
+#generate an Experimental Unit
+#I do not know how to do that in one go in a pipe, cur_group_id() indexes without starting at 0 for when changing groups
+#ask Colin
+LHAM_ExperimentalUnit <- LHAM_SubjectID_Treatment %>%
+  left_join(.,LHAM_AnimalInfo_General %>% select(AnimalID,Sex,LitterRef)) %>%
+  left_join(.,LHAM_StartDate) %>% 
+  arrange(ExpName,Sex,StartDate) %>% #to have the experimentalunit referring the sequence in which animals were done. If adding BS experiment I would need ExpName in the dile
+  distinct(ExpName,Sex,LitterRef) %>%
+  #GROUP BY EXPNAME, SEX
+  group_by(ExpName,Sex) %>% 
+  mutate(ExperimentUnit = row_number()) %>% #this generates an ExperimentUnit, I would not know how to do that without a distinct that reduces to one row per litter. 
+  ungroup() %>% 
+  #UNGROUP()
+  left_join(.,LHAM_AnimalInfo_General %>% 
+  select(ExpName,AnimalID,Sex,LitterRef))
+
+View(LHAM_ExperimentalUnit)
+
+
+###########################################Combine all information specific to experiments
+LHAM_AnimalInfo_Specific <- LHAM_AnimalInfo_General %>% 
+  select(ExpName,AnimalID) %>% 
+  left_join(.,LHAM_StartDate) %>% 
+  left_join(.,LHAM_StartColony) %>% 
+  left_join(.,LHAM_ExperimentalGroup %>% select(-Date,Date_W1)) %>%
+  left_join(.,LHAM_ExperimentalUnit %>% select(AnimalID,ExperimentUnit)) %>%
+  left_join(.,LHAM_SubjectID_Treatment) %>% 
+  mutate(ExperimentalSeries = case_when(ExpName == "LHAM" & StartDate > "2017-10-01"  ~ 2, 
+                                        TRUE ~ 1)) #add an experimental serie for LHAM as it may explain difference in sampling
+View(LHAM_AnimalInfo_Specific)
+  
+```
+
+
+Add LHAM specific info to LHAMT
+
+```{r LHAM-LHAMT individual info}
+
+#I can add death age 
+
+LHAMT_AnimalInfo_All <- LHAMT_AnimalID %>%
+  left_join(.,LHAM_LHAMT_AnimalInfo) %>% 
+  mutate(DeathAge = (DeathDate - BirthDate)/30.4375) %>% 
+  left_join(.,LHAM_AnimalInfo_Specific) %>% 
+  left_join(.,LHAMT_Brain %>% select(AnimalID,Training,BreedingStatus)) %>% 
+  left_join(.,LHAMT_Punched %>% 
+              distinct(AnimalID) %>% 
+              mutate(Punched = "Yes")) %>% 
+  left_join(.,LHAMT_Sequenced %>% 
+              distinct(AnimalID) %>% 
+              mutate(Sequenced = "Yes")) %>% 
+  mutate(BreedingStatus = case_when(DeathAge < 5 ~ "Pup",
+                                    TRUE ~ BreedingStatus)) %>% #to change the breedingStatus of the 4 pups to pups to generate correct samples size
+  arrange(Sex, FirstColony, ExperimentUnit)
+View(LHAMT_AnimalInfo_All)
+names(LHAMT_AnimalInfo_All)
+
+```
+
+
+##Sample size and data check
+79 animals were euthanized (females: 20 non-breeders, 8 solitary, 13 breeders; males:16 non-breeders, 18 breeders, 4 pups), including 52 subjects which were part of an experiment in which the breeding status of same-sex litter mate was experimentally controlled. In 19 cases, euthanization was not a priori planned in the generation of the data set but for training purposes. 
+
+Micropunches were collected from the brain of 54 individuals (females: 15 non-breeders, 8 solitary, 11 breeders; males:10 non-breeders, 10 breeders). Among these, 4 brains were meant to be used for training purposes (L2F009 and L2F010 from L2T002, Z3F022 from Z3T003, and BEF001 from Bennett). 
+
+All individuals from which micropunches were collected had at least one sample being sequenced. 
+
+Analyses should be re-run after the exclusion of samples that were collected for training purposes (see above). Z3F022 should be considered as a solitary female and whether LAF007 and TSM038 (Bontebok), and RAM001 who were all labelled as breeders had conceived should be verified. 
+
+Micropunches that were sequenced should be highlighted on the pictures of brain slices to assess whether exclusion from the dataset or better alternatives should be considered. 
+
+
+
+The samples 
+
+```{r Punches-Sequencing data check}
+
+########################################Original dataset 
+View(LHAMT_AnimalInfo_All)
+names(LHAMT_AnimalInfo_All)
+
+LHAMT_AnimalInfo_All %>% 
+  filter(BreedingStatus == "Unknown")
+
+
+#Sample size
+table(LHAMT_AnimalInfo_All$Sex, LHAMT_AnimalInfo_All$BreedingStatus)
+#20 NB females
+#8 Solitary female
+#13 Breeding female 
+
+#16 NB males
+#18 B males (Z3m006 classified as unknown but is a breeder)
+#4 pups
+
+#Euthanized animals that are experimental
+View(LHAMT_AnimalInfo_All %>%
+       filter(ExpName == "LHAM"))
+
+#Helpers that bred?
+View(LHAMT_AnimalInfo_All %>% 
+       filter(BreedingStatus == "Helper") %>% 
+       filter(!(is.na(FirstLitterDate))))
+#No helper that were assigned the status of helper ever gave birth
+  
+
+#Breeders that never bred?
+View(LHAMT_AnimalInfo_All %>% 
+       filter(BreedingStatus %in% c("King","Queen")) %>% 
+       filter(is.na(FirstLitterDate)))
+#Bontebok pair (LAF007, TSM038) never gave birth in the lab but I would need to check with Rachel that the queen was pregnant at the time of sacrifice
+#RAM001 the king from Karoo may never have conceived. He had been paired with ARF001 on 30th October 2017 who died on the 30th March 2018. ARF014 was then added into Karoo on the 19 September 2018 and RAM001 euthanized 8 days later on the 27th September 2018. 
+#We should have a look at whether ARF001 and ARF014 ever gave evidence of pregnancy. If not the male could be excluded from analyses
+
+
+
+
+########################################Punches
+#Sample size of punched animals
+Punched_Subset <- LHAMT_AnimalInfo_All %>% 
+  filter(Punched == "Yes")
+View(Punched_Subset)
+#54 distinct animals out of the 79 individuals that were euthanized were punched
+
+
+#Sample size
+table(Punched_Subset$Sex, Punched_Subset$BreedingStatus)
+
+#Euthanized animals not punched
+LHAMT_NotPunched <- LHAMT_AnimalInfo_All %>% 
+  filter(is.na(Punched)) %>% 
+  arrange(AnimalID)
+View(LHAMT_NotPunched)
+#25 animals were not punched
+
+#6 animals for which euthanization was not planned: G13M006 (breeder G13), Z3M006 (Breeder Z3), Z3M025 (helper Z3), Z4M001 (breeder Bshary), G4F022 (LHAM control found in Curie), ARF013 (euthanized animal due to paralyzation)
+
+#4x pups for Shazia: VIF018, ENM014, MEM026, TSM053 done for shazia
+
+#2x Breeding Females
+ #L2F020 LHAM Amboseli
+ #HEF001 LHAM Virunga (Control HEF003 had become breeder in Hermes)
+
+#3x Non-breeding females
+ # G4F019 LHAM  
+ #G1F022 LHAM 
+ #ARF002 LHAM 
+
+#5x Breeding males
+ #CUM002 LHAM Amboseli
+ #CRM003 LHAM Virunga
+ #Z1M022 LHAM Aloatra
+ #LOM002 LHAM Kilimanjaro
+ #LOM008 Non-experimental Masai Mara
+
+#5x Non-breeding males
+ #CUM003 LHAM Helper (euthanized for Shazia, why wasn't it euthanized at same time than    CUM002? possibly because alone in its tunnel system CUT001)
+ #GLM003 Shazia 12M
+ #L6M014 Shazia 12M
+ #LYM003 Shazia Old
+ #SAM002 Shazia Old
+
+
+#Experimentals animals that were not punched
+LHAMT_ExperimentalNotPunched <- LHAMT_AnimalInfo_All %>% 
+  filter(LHAMT_Euthanized == "Yes") %>% 
+  filter(!(is.na(ExperimentUnit))) %>% 
+  filter(is.na(Punched)) %>% 
+  select(Sex, ExperimentUnit, BreedingStatus,AnimalID)
+View(LHAMT_ExperimentalNotPunched)
+#10 experimentals animals were among the 25 non-punched animals
+#All of them were single the single representative of their Experiment Unit at the exception of Experimental Unit Male 4
+
+
+#Experimental units in which not all animals were punched 
+LHAM_IncompletePunch <- LHAMT_AnimalInfo_All %>% 
+              filter(Punched == "Yes") %>%
+              filter(!(is.na(ExperimentUnit))) %>% 
+              select(Sex,ExperimentUnit,AnimalID,BreedingStatus) %>% #get all experiment animals that were punched
+  inner_join(., LHAMT_AnimalInfo_All %>% #join to same Sex and Experiment Unit that were not punched
+  filter(is.na(Punched)) %>% 
+  select(Sex, ExperimentUnit, BreedingStatus,AnimalID),by=c("Sex","ExperimentUnit"))
+View(LHAM_IncompletePunch)
+#There are 2 experimental animals that were not punched and should ideally have since a representant of their experimental unit was punched. The 2 experimental units were only constituted of a solitary and a helper but not by a breeder
+#G1F022 LHAM helper, G1F025 is a solitary that had been punched
+#G4F019 LHAM helper (had emigrated into Tesla on the 6th Dec 2017 the day was supposed to be euthanized, was euthanized the day after), G4F020 is a solitary that had been punched
+  
+
+
+#Experimental and non-experimental animals from same StartColony that were not entirely punched
+LHAMT_IncompletePunch <- LHAMT_AnimalInfo_All %>% 
+  filter(Punched == "Yes") %>%
+  filter(!(Training == "Yes")) %>% 
+  select(Sex,FirstColony,AnimalID,BreedingStatus) %>% #get all non-training animals that were punched
+  inner_join(., LHAMT_AnimalInfo_All %>% #join to same Sex and StartColony that were not punched
+  filter(is.na(Punched)) %>% 
+  select(Sex, FirstColony, ExperimentUnit,BreedingStatus,AnimalID),by=c("Sex","FirstColony"))
+View(LHAMT_IncompletePunch)
+#it looks like that none of the unpunched animals were of the same group as the punched animals, beside the 2 experimental animals mentionned above
+
+
+
+#################################################Sequencing
+
+Sequenced_Subset <- LHAMT_AnimalInfo_All %>% 
+  filter(Sequenced == "Yes")
+View(Sequenced_Subset)
+#54 distinct animals were sequenced
+#Thus seems all punched animals were sequenced
+
+#Data check: Animals sequenced but not punched
+View(anti_join(LHAMT_AnimalInfo_All %>% 
+  filter(Sequenced == "Yes"),LHAMT_AnimalInfo_All %>% 
+  filter(Punched == "Yes"),by=("AnimalID")))
+#It seemed that CRF007 did not appear on the Punches file. 
+#CRF002 had been duplicated. Excel file has been corrected but must be checked on paper sheet
+
+
+#Sample size for mPOA
+
+View(Sequenced_Subset)
+
+
+
+
+#Sample size for CA1
+
+#Sample size for CA3 
+
+#Sample size for Amy
+
+LHAMT_AnimalInfo_All
+
+
+#Animals that were considered as training animals and that were sequenced
+LHAMT_Training_Sequenced <- LHAMT_AnimalInfo_All %>% 
+       filter(Sequenced == "Yes") %>%
+       filter(Training == "Yes")
+#4 animals that were sequenced were considered as training animals 
+#L2F009: Was in L2T002 when euthanized
+#L2F010: Was in L2T002 when euthanized
+#Z3F022: Was in Z3T003 when euthanized
+#BEF001:had a calcified growth on lower right jaw. Had been monitored for a month before was decided to euthanize. Have a look at weight profile to assess whether could be used or not.
+#Analyses should be considered in their absence
+
+
+#Group Size of animals that were sequenced and considered as training 
+Training_Membership <- membership(LHAMT_Training_Sequenced %>% 
+                                  select(AnimalID, DeathDate) %>% 
+                                  rename(Date = DeathDate) %>% 
+                                  mutate(Date = Date -7),Membership_Extract)
+View(Training_Membership)
+
+Training_GroupSize <- groupcomp(Training_Membership %>% 
+                                  select(Colony,Date),
+                                Membership_Extract)
+#Z3F022 should be considered as a solitary female
+#L2F009 and F010 were living together 
+
+
+
+
+
+#I should also consider taking into account the breeding status of the group for the analyses
+```
+
+
+```{r sample size visualization}
+
+```
+
+
+##Scan 
+
+
+## Urine samples
+
+```{r data prep}
+
+#Urine samples collected after removing urine specific data
+#Up to a certain date the group of the animals were entered manually which could have resulted in mistakes
+UrineSamples <- Urine_Collected %>% 
+  select(Colony, AnimalID, UrineNumber, UrineDate, Label) %>% 
+  rename(SampleID = UrineNumber)
+View(UrineSamples)
+#26'130 samples have been collected
+
+
+#List of dates at which animals were sampled
+UrineDates <- Urine_Collected %>% 
+  select(AnimalID, UrineDate) %>% 
+  rename(Date = UrineDate)
+
+
+#Query the groups which animals were part of at the time of samples 
+UrineDates_Membership <- membership(UrineDates,Membership_Extract) %>% 
+  select(-ColonyLocation)
+View(UrineDates_Membership)
+
+
+#Combinations of AnimalID and Urine Dates with more than 1 colony because they were collected on days animals changes groups
+Urine_DoubleMembership <- UrineDates_Membership %>% 
+  #GROUP BY 
+  group_by(AnimalID,Date) %>% 
+  mutate(ColonyCount = n_distinct(Colony)) %>% 
+  filter(ColonyCount > 1) %>% 
+  ungroup()
+  #UNGROUP
+  View(Urine_DoubleMembership)
+#there are 115 entries that were done on the day animal changed groups, causing a duplication of SampleID
+#This would cascade in errors in group compositions
+  
+  
+#Urine samples coresponding to the combinations of AnimalsID and Dates with more than 1 colony
+SampleID_DoubleMembership <- Urine_DoubleMembership %>% 
+  inner_join(.,UrineSamples %>% select(AnimalID, UrineDate, SampleID), by=c("AnimalID","Date" = "UrineDate")) %>% 
+  distinct(SampleID) %>% 
+  pull()
+View(SampleID_DoubleMembership)
+  
+  
+#Mismatch between colony that was entered manually and colony that were queried using the membership()
+Urine_Colony_Mismatch <- UrineSamples %>%
+  left_join(.,UrineDates_Membership %>% 
+              rename(QueriedColony = Colony, 
+                     UrineDate = Date)) %>% 
+  filter(QueriedColony != Colony) %>% 
+filter(!(SampleID %in% SampleID_DoubleMembership))#remove samples that were collected on the day animals changed groups, thus creating a possible mismatch between group entered and queried
+View(Urine_Colony_Mismatch)
+#362 mismatch if I don't remove the samples collected on the days animals changed groups 
+# all mistakes almost are done before 27/11/2016. 
+#after removing samples collected from animals on the day they changed groups only 81 mismatch left
+
+```
+
+
+##LHAM - BS
+
+
+```{r load data}
+
+```
+
+
+```{r data exploration}
+
+#Experimental Unit with 2 individuals per treatment
+Treatment_Duplicate <- LHAMBS_IDinfo %>%
+  #GROUP BY
+  group_by(ExpName,Sex,ExperimentUnit,Treatment) %>% 
+  mutate(TreatmentDuplicate = n()) %>% 
+  ungroup() %>% 
+  filter(TreatmentDuplicate > 1)
+##Breeder
+#VGF001 (Ruru), VGF002 (Orycterope)
+#TSF047(Ritz),TSF048(Milou)
+#G10M033(Milou),G10M034(Orycterope)
+#CUM002(Amboseli), CUM001 (Gombe)
+
+##Helper (All BS experiment)
+# CUF032, CUF034	
+# WEF016, WEF017	
+# BEM008, BEM005	
+# DRM005, DRM008	
+# LAM014, LAM016	
+# WEM018, WEM019, WEM020	
+# BEM021, BEM023
+
+
+#Breeder that never gave birth (I don't think we ever abandoned a Experimental Unit if the helper died)
+
+
+#Abandoned Experimental unit
+#Experimental unit that had to be abandoned quite rapidly
+Group_Duplicate <- LHAMBS_IDinfo %>%
+  #GROUP BY 
+  group_by(Sex,ExperimentalGroup) %>% 
+  mutate(GroupUse = n()) %>% 
+  ungroup()
+View(Group_Duplicate)
+  
+
+
+
+
+```
+
+
+##LHAM_Tissue
+The LHAM_Tissue project is distinct from the LHAM experiment in that it uses a mixture of experimental and non-experimental animals. All experimental subjects were euthanized for tissue collection
+
+The following animals were euthanized opportunistically and it should be determined whether their data should be used or not. 
+
+ARF013 (Helper from Aristotle): taken out for blood and found to be paralyzed from hips down
+Not sequenced
+
+BEF001 (Helper from Bennett): had a calcified growth on lower right jaw. Had been monitored for a month before was decided to euthanize. Have a look at weight profile to assess whether could be used or not.
+Has been sequenced
+
+G4F022 (Helper from G4): Was an experimental LHAM animal but was found in Curie, I believe on the morning it was supposed to be sacrificed. One would need to assess for how long the animal had been left in Curie
+Not sequenced
+
+G13M006 (Breeder from G13): euthanized for health reasons. According to the vet due to a liver disease causing water retention in abdomen
+Not sequenced
+
+Z3M006 (Breeder from Z3): Was hit by a pipe during cleaning. Dead or near dead by the time it was euthanized
+Not sequenced
+
+Z3M025 (Helper from Z3): found sick with diarhea at 11 a.m. put in box and euthanized at 1 p.m. Animal almost if not dead by the time of euthanasia. 
+Not sequenced
+
+Z4M001 (Breeder from Bshary): Animal found dying (as good as dead) in colony. Head taken for brain sampling. Necropsy done by IG: discolored kidney, small pancreas, dark gall bladder, white spots on spleen, thinning of wall of intestine, large intestine yellowish
+Not sequenced
+
+```{r load data}
+
+
+#Get individual characteristic of euthanized animals
+#join with LHAM data
+LHAMT_IDinfo <- LHAMT_Brain %>% 
+  select(AnimalID,BreedingStatus,Training) %>% #BreedingStatus has been manually entered and that would need to be compared with queried status
+  left_join(.,AnimalID_LitterRef) %>% 
+  left_join(.,AnimalID_BirthDate) %>% 
+  left_join(.,AnimalID_Sex) %>% 
+  left_join(.,AnimalID_DeathDate) %>% 
+  mutate(DeathAge = (DeathDate - BirthDate)/30.4375) %>% 
+  left_join(.,LHAMBS_IDinfo %>% 
+              select(AnimalID,ExpName,ExperimentUnit,ExperimentalSeries,Treatment,ExperimentStart,StartColony, ExperimentalGroup,ExperimentStart_Age,Experiment_Duration))
+View(LHAMT_IDinfo)
+names(LHAMBS_IDinfo)
+
+
+#Animal punched 
+Punches_AnimalList <- LHAMT_Punched %>% 
+  distinct(AnimalID)
+View(Punches_AnimalList)
+
+#Out of the 78 animals for which a brain sample was available for RNAseq, 53 only have apparently been punched. That seems quite low to me and would need checking
+
+
+#Animal Sequenced
+Sequencing_AnimalList <- LHAMT_Sequenced %>% 
+  distinct(AnimalID)
+View(Sequencing_AnimalList)
+#Out of the 78 animals for which a brain was available for RNAseq, 54 have been sequenced
+#it seems there is one more animal that has been sequenced than the number of animal that has been punched
+
+
+#Subset to animals for which sequencing data is available
+LHAMT_Sequenced_IDinfo <- Sequencing_AnimalList %>% 
+  left_join(.,LHAMT_IDinfo)
+View(LHAMT_Sequenced_IDinfo)
+
+```
+
+
+```{r data exploration and summary}
+
+#ExperimentDuration
+View(LHAMT_Sequenced_IDinfo %>% 
+       arrange(Experiment_Duration))
+summary(as.numeric(LHAMT_Sequenced_IDinfo$Experiment_Duration))
+#Experimental animals that were euthanized were paired for at least 10 months at the only exception of TSM038 (Bontebok King) and M039 (control) that were euthanized one month after being used 
+
+table(LHAMT_Sequenced_IDinfo$Sex,LHAMT_Sequenced_IDinfo$BreedingStatus)
+
+
+#Age of youngest sequenced animal at the start of experiment 
+#This could inform when we could start taking behavioural data before pairing
+summary(as.numeric(LHAMT_Sequenced_IDinfo$ExperimentStart_Age))
+View(LHAMT_Sequenced_IDinfo %>% 
+  filter(ExperimentStart_Age < 15))
+#G1F025 Kruger solitary was the youngest animal to enter the experiment was 13.6 months
+#4 animals were younger than 15 months at the start of experiment
+
+
+#Are thre any non-experimental breeder (to assess if all breeders had an experimental start)
+#That will be an issue to assess how many scans done after they have been paired (since there is no experimental start)
+View(LHAMT_Sequenced_IDinfo %>% 
+  filter(BreedingStatus == "King" & is.na(ExperimentStart) | BreedingStatus == "Queen" & is.na(ExperimentStart)))
+#G3M020 king from Addo
+#G10F026 queen from Who
+#This will cause an issue when querying the behaviours
+
+View(LHAMT_Sequenced_IDinfo)
+
+
+#Euthanized animals not punched 
+#Animals were either not punched because they were of no use OR because of lack of time
+Euthanized_NotPunched<- anti_join(LHAMT_IDinfo,Punches_AnimalList,by="AnimalID") %>% 
+  arrange(Sex,AnimalID,Training)
+View(Euthanized_NotPunched)
+#26 animals euthanized but not punched
+
+#6 animals for which euthanization was not planned: G13M006 (breeder G13), Z3M006 (Breeder Z3), Z3M025 (helper Z3), Z4M001 (breeder Bshary), G4F022 (LHAM control found in Curie), ARF013 (euthanized animal due to paralyzation)
+
+#4 pups for Shazia: VIF018, ENM014, MEM026, TSM053 done for shazia
+#2 12m for Shazia: #GLM005, L6M014 
+#3 Old for Shazia: LYM003, SAM002, CUM003
+
+
+##11 animals remain: I must write a reason for the consequence of these animal not being done. I was trying prioritize animals for wich another animal from the same unit was present so perhaps that explains
+
+#L2F020 LHAM queen from Amboseli
+#CUM002 LHAM King Amboseli
+
+#HEF001 LHAM queen from Virunga
+#CRM003 LHAM King Virunga
+
+#CRF007 LHAM queen from Masai Mara 
+#LOM008 Breeder in Masai Mara non-experimental
+
+#Z1M022 LHAM King Aloatra
+
+#LOM002 LHAM King in Kilimanjaro
+
+#TSM038 LHAM King Bontebok apparently punched
+
+
+#G4F019 LHAM Helper 
+#G1F022 LHAM Helper
+#ARF002 LHAM Helper
+
+
+#Animals punched but not sequenced
+#Are there animals that had been forgotten for sequencing?
+#Are there animals that were punched and perhaps should not have been sequenced
+
+
+#Similar Brain region sequenced 2x
+Duplicated_BrainRegion <- Sequencing %>% 
+  group_by(AnimalID,BrainRegion) %>% 
+  mutate(BrainRegion_Duplicate = n()) %>% 
+  ungroup() %>% 
+  filter(BrainRegion_Duplicate >1)
+# GRF004 AMY
+# WAF011 CA1 
+# Why?
+
+
+#Overview of brain region sequenced by individuals
+BrainRegion_ByIndividual <- Sequencing %>%  
+  select(AnimalID,Sex,BreedingStatus,BrainRegion) %>% 
+  group_by(AnimalID,BrainRegion) %>% 
+  mutate(Count = n()) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  pivot_wider(names_from = BrainRegion, values_from = Count) %>% 
+  arrange(Sex,BreedingStatus,AnimalID)
+View(BrainRegion_ByIndividual)
+#A few individuals have not had all of their 3 regions sampled 
+
+```
+
+
+```{r Behavioural Data}
+
+#Scan observation performed on sequenced animals 
+#Must have Group, ObsDate, AnimalID 
+Sequenced_Scan <- Sequencing_AnimalList %>% 
+  left_join(.,IndividualScanDate_OldNew_All) %>% 
+  left_join(.,LHAMT_Sequenced_IDinfo)
+View(Sequenced_Scan)
+#1325 scans were collected on animals that were sequenced
+
+
+#Add age of animals at each scan 
+#Add the delay with death
+#Was it before or after Experiment start? There are two breeders that are non-experimental G3M020 king from Addo and G10F026 queen from Who. I will manually add the pairing date as "ExperimentStart" for plotting purpose
+poop <- LHAMT_Sequenced_IDinfo %>% 
+  select(AnimalID,BreedingStatus,BirthDate,DeathDate,ExperimentStart) %>% 
+  mutate(ExperimentStart = as.character(ExperimentStart)) %>% 
+  mutate(ExperimentStart = case_when (AnimalID == "G3M020" ~ "2017-06-18",
+                                      AnimalID == "G10F026" ~ "2017-06-18",
+                                      TRUE ~ ExperimentStart)) %>% #assign a fake start date to non-experimental breeder in dataset
+  mutate(ExperimentStart = ymd(ExperimentStart)) %>% 
+  left_join(Sequenced_Scan) %>% 
+  mutate(ObsAge = as.numeric(ObsDate - BirthDate)/30.4375) %>% #Age in months at which animal were observed
+  mutate(Obs_DeathDelay = as.numeric(DeathDate - ObsDate)/30.4375) %>% 
+  mutate(Obs_ExpStartDelay = as.numeric(ObsDate - ExperimentStart)/30.4375) %>% 
+        mutate(MonthsBeforeDeath = case_when(Obs_DeathDelay < 6 ~ 6,
+                                            Obs_DeathDelay >= 6 & Obs_DeathDelay <12  ~ 12,
+                                           Obs_DeathDelay >= 12 & Obs_DeathDelay <18  ~ 18,
+                                           Obs_DeathDelay >= 18 & Obs_DeathDelay <24  ~ 24,
+                                           Obs_DeathDelay >= 24 & Obs_DeathDelay <30  ~ 30,
+                                           Obs_DeathDelay >= 30 & Obs_DeathDelay <36  ~ 36,
+                                           Obs_DeathDelay >= 36 & Obs_DeathDelay <42.5  ~ 42,
+                                          TRUE ~ Obs_DeathDelay))
+View(poop)
+#1325 scan
+
+
+poop2 <- poop %>% 
+  filter (
+    (BreedingStatus == "Solitary" & Obs_ExpStartDelay > 0) |
+            (BreedingStatus == "Queen" & Obs_ExpStartDelay > 0) |
+             (BreedingStatus == "King" & Obs_ExpStartDelay > 0) |
+              (ObsAge > 11 & is.na(Obs_ExpStartDelay))| #non experimental helpers
+             (ObsAge > 11 & BreedingStatus == "Helper" & !(is.na(Obs_ExpStartDelay)))
+    ) %>% #Experimental helpers
+  mutate(MonthsBeforeDeath = as.factor(MonthsBeforeDeath))
+str(poop2)
+
+
+poop3 <- poop2 %>% 
+  select(AnimalID, BreedingStatus,MonthsBeforeDeath) %>% 
+  group_by(AnimalID, BreedingStatus, MonthsBeforeDeath) %>% 
+  summarize(Scan_Count = n()) %>% 
+  arrange(BreedingStatus,AnimalID,MonthsBeforeDeath) 
+str(poop3)
+#this reduces to 555 scans
+
+
+#probably better to do them as 4 separate plot and to join them after
+figure_Scan<- ggplot(poop3, aes(MonthsBeforeDeath,Scan_Count)) +
+  geom_boxplot(outlier.shape = NA,) +
+  geom_jitter(width=0.3, size=3, alpha = 0.25)+
+    facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() 
+
+
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(figure_Scan)) %>% 
+  print(.,target="Scan.pptx")
+    
+  
+
+```
+
+```{r urine data}
+
+Sequenced_Urine <- Sequencing_AnimalList %>% 
+  left_join(.,Urine_Collected %>% 
+              select(AnimalID,UrineNumber,UrineDate))
+View(Sequenced_Urine)
+#1626 collected on the euthanized animals
+
+
+
+#Add age of animals at each scan 
+#Add the delay with death
+#Was it before or after Experiment start? There are two breeders that are non-experimental G3M020 king from Addo and G10F026 queen from Who. I will manually add the pairing date as "ExperimentStart" for plotting purpose
+Urine <- LHAMT_Sequenced_IDinfo %>% 
+  select(AnimalID,BreedingStatus,BirthDate,DeathDate,ExperimentStart) %>% 
+  mutate(ExperimentStart = as.character(ExperimentStart)) %>% 
+  mutate(ExperimentStart = case_when (AnimalID == "G3M020" ~ "2017-06-18",
+                                      AnimalID == "G10F026" ~ "2017-06-18",
+                                      TRUE ~ ExperimentStart)) %>% #assign a fake start date to non-experimental breeder in dataset
+  mutate(ExperimentStart = ymd(ExperimentStart)) %>% 
+  left_join(Sequenced_Urine) %>% 
+  mutate(UrineAge = as.numeric(UrineDate - BirthDate)/30.4375) %>% #Age in months at which Urine was collected
+  mutate(Urine_DeathDelay = as.numeric(DeathDate - UrineDate)/30.4375) %>% 
+  mutate(Urine_ExpStartDelay = as.numeric(UrineDate - ExperimentStart)/30.4375) %>% 
+        mutate(MonthsBeforeDeath = case_when(Urine_DeathDelay < 6 ~ 6,
+                                            Urine_DeathDelay >= 6 & Urine_DeathDelay <12  ~ 12,
+                                           Urine_DeathDelay >= 12 & Urine_DeathDelay <18  ~ 18,
+                                           Urine_DeathDelay >= 18 & Urine_DeathDelay <24  ~ 24,
+                                           Urine_DeathDelay >= 24 & Urine_DeathDelay <30  ~ 30,
+                                           Urine_DeathDelay >= 30 & Urine_DeathDelay <36  ~ 36,
+                                           Urine_DeathDelay >= 36 & Urine_DeathDelay <42.5  ~ 42,
+                                          TRUE ~ Urine_DeathDelay))
+View(Urine)
+#1626 scan
+
+Urine2 <- Urine %>% 
+  filter (
+    (BreedingStatus == "Solitary" & Urine_ExpStartDelay > 0) |
+            (BreedingStatus == "Queen" & Urine_ExpStartDelay > 0) |
+             (BreedingStatus == "King" & Urine_ExpStartDelay > 0) |
+              (UrineAge > 11 & is.na(Urine_ExpStartDelay))| #non experimental helpers
+             (UrineAge > 11 & BreedingStatus == "Helper" & !(is.na(Urine_ExpStartDelay)))
+    ) %>% #Experimental helpers
+  mutate(MonthsBeforeDeath = as.factor(MonthsBeforeDeath))
+View(Urine2)
+#569 urine samples
+
+
+Urine3 <- Urine2 %>% 
+  select(AnimalID, BreedingStatus,MonthsBeforeDeath) %>% 
+  group_by(AnimalID, BreedingStatus, MonthsBeforeDeath) %>% 
+  summarize(Urine_Count = n()) %>% 
+  arrange(BreedingStatus,AnimalID,MonthsBeforeDeath) 
+View(Urine3)
+#this reduces to
+
+
+#probably better to do them as 4 separate plot and to join them after
+figure_Urine<- ggplot(Urine3, aes(MonthsBeforeDeath,Urine_Count)) +
+  geom_boxplot(outlier.shape = NA,) +
+  geom_jitter(width=0.3, size=3, alpha = 0.25)+
+    facet_grid(rows = vars(BreedingStatus))+
+  theme_bw() 
+
+
+my_pres<-
+  # Load template
+  read_pptx() %>%
+  # 02 - SLIDE
+  add_slide(layout = "Title and Content", master = "Office Theme") %>%
+  # 02 - Title
+  ph_with_text(type = "title", str = "") %>%
+  ph_with_vg(code = print(figure_Urine)) %>% 
+  print(.,target="Urine.pptx")
+
+
+
+```
+

@@ -1,0 +1,912 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+```{r package}
+
+rm(list = ls())
+
+#Data tidying
+library(tidyverse)
+
+
+#Data exploration
+library(broom)
+library(tidyverse)
+library(cowplot)#
+library(ggcorrplot)#
+library(PerformanceAnalytics)#For correlation plot
+library(gridExtra)#
+library(FactoMineR)#
+library(factoextra)#
+
+
+#Data analyses
+
+```
+
+
+#Info and functions
+```{r data and functions}
+
+#extract relevant info from database
+#don't run the new behaviour import if not necessary because it takes for ages
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/Database_Extract_20210214.R")
+
+#Load relevant functions
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/DMRfunctions_20210202.R")
+
+#Prepare most relevant data
+#I could already have all
+source("C:/Users/Philippe/Dropbox/PhD_20150515/Research projects/DMR_Ratop/DataPreparation_20200113.R")
+
+```
+
+
+#Data preparation 
+
+The first thing is to have a look at the overlap with the focal data preparation file. All the behavioural info should be taken from there. On the 14/04/2021, I have created a data preparation file for the LHAM_T differences between breeders and no-breeders where I will be joining group and individual info 
+
+State behaviours can generate proportion of duration and frequency (but this will better be calculated for all behaviours at the same time)
+
+Raw data and duplication/randomization of old data summary will be used for networks analyses
+
+Else data will be summarized by FocalRef, Day or whatever metrics is suited. This will need disregarding some modifiers and taken into considerations others to subset behaviours
+
+Remaining question:
+1) when zeros are generated. Before or after the merge of State and Point. In any case zeros should be generated after modifier have been disregarded 
+2) How to recategorize
+3) When should we generate daily information or else. At the moment I think It should be after Point and state have been merged
+4) I think frequency and duration should be calculated after I have merged state and point
+
+
+Questions to TimV
+1) Where can I find a list of all Behaviours by type and modifiers in order to have an idea about all types of combination that are possible (this will be useful to generate zeros)
+2) Where has he arranged all the discrepancies in spelling? How did he make sure we have been consistent?
+3) what Tim explained me was for the correction of received, but he has not explained me where all behaviours can be find
+
+
+Errors to be corrected
+1) There are FocalRef for which there is no state behaviour recorded: DONE; Dave will have to correct and an issue has been placed on GitLab
+2) I am still unsure where the spelling is corrected.
+3) qry_FocalStateSummary_Mrdb does have a FocalBehavRef which I think is unecessary
+4)There is an issue with Drumming as it gets a NA for received
+5) I must plot behaviour against time. Especially Rdrumming, DropFS, Food competition with modifier as the way it was recorded changed somewhere in time (cannot remember whether it was focal or scan)
+
+
+
+Question solved (I Think)
+2) qry_FocalPoint_MrRaw has a lot of duplicated events. Where do they come from? That will certainly have generated a wrong number of count in the summary
+3) Data source in qry_FocalPointSummary_Mrdb is written MoleratDatabase. Must be changed. In FocalState it is written correctly
+4) ModifierValues in qry_FocalPoint_Summary_Mrdb and qry_FocalStateSummary_Mrdb are still as codes. In MrRawdata (new) they are as label. Thus and thus qry_FocalPoint_Summary_All and qry_FocalStateSummary_All are a mix of the 2
+5) Received value always seem to be as 0 and 1
+
+##Session
+
+```{r Session}
+
+##########################################Session
+
+#Focal Sessions 
+View(qry_FocalSession_All)
+names(qry_FocalSession_All)
+#13'368 focal observations, not imported since July 2021
+#gives the name of the colony
+
+View(qry_FocalSession_All %>% 
+       distinct(DataSource))
+#Data origin is used here as opposed to data sourced in the behaviour
+
+View(qry_FocalSession_All %>% 
+       distinct(FocalRef,DataSource))
+#13'368 distinct focal sessions 
+#I would have to do whether some observation have been imported old and new fashion way together
+
+
+##########################################Check
+  
+#Duplicates 
+View(qry_FocalSession_All %>% 
+distinct(FocalRef,DataOrigin))
+#No duplicates 
+#Some of these focal ref seem to have no recorded state behaviour (see State Check section)
+
+```
+
+
+##State 
+
+State behaviours are used to calculate the duration of a focal observation
+
+Currently, AnimalID can be as ModifierClass 1 or ModifierClass 2 and I think it would be easier to have it all in the same column but would probably require quite a lot of work from TimV
+
+There are 4 state behaviours that can be received (Huddeling, Groom, Beg/Suckle, Drumming). For now I exclude them in the calculation of duration
+
+
+```{r State Data}
+
+#Focal state all
+View(qry_FocalStateSummary_All)
+
+View(qry_FocalStateSummary_All %>% 
+       distinct(FocalRef,DataSource))
+
+names(qry_FocalStateSummary_All)
+#108'526 rows of state behaviours
+#this does not include zeros
+
+
+#Check number of focal sessions
+View(qry_FocalStateSummary_All %>% 
+       distinct(FocalRef,DataSource))
+#only 13'006 sessions, which is 362 sessions less than when querying with FocalSession
+#This is an error that must be solved
+
+
+#List of focal behaviours
+#How can I be sure that all behaviours are here? and that behaviours with other spelling may not have been missed
+Behaviour_State_List <- con %>%
+  dbGetQuery("SELECT `Temp`.`Value`,
+`Temp`.`Label`,
+MR_RawData.usys_FocalBehaviourCorrection.BehaviourRaw,
+MR_RawData.usys_FocalBehaviourCorrection.ReceivedModifier,
+MR_RawData.usys_FocalBehaviourCorrection.CorrectionRef
+FROM 
+(SELECT * FROM MR_MainData.tblCodeList
+WHERE CodeRef = 'FocalStateBehav') AS Temp
+LEFT JOIN MR_RawData.usys_FocalBehaviourCorrection ON Temp.Value = usys_FocalBehaviourCorrection.BehaviourValue") %>% 
+  rename(Behaviour = Label)
+
+View(Behaviour_State_List %>% 
+       distinct(Behaviour))
+#There are 17 behaviours that have been recorded 
+#Do we want to take into account the values of modifiers for a few of them? or keep them like that? Ask Vinkel where all combination can be found?
+
+
+#categories could be created here, suggestions are
+
+
+# #If one want to query from behaviour recorded
+# Behaviour_State_List <- qry_FocalStateSummary_All %>% 
+#   filter(Behaviour != "Out of sight") %>% 
+#   distinct(Behaviour)
+# View(Behaviour_State_List)
+
+
+#######Excluded
+#Out of sight
+#? Other behaviour?
+
+
+####################################################"Non Social"
+
+###########################Non Cooperative
+
+#######Rest
+#Huddeling (Social?)
+#Rest
+
+#######Selfish
+#Eat
+
+#Self groom
+
+#######Other
+#Miscellaneous
+
+#Gnaw (Cooperative?)
+
+
+###########################Cooperative
+
+#######Work
+#Sweep
+#Dig
+#Kick
+
+#######Carry food
+#Carry food
+
+#######Nest building
+#Carry NM
+#Nest Building
+
+
+####################################################"Social interactions
+
+#######Cooperative
+#Groom
+
+#######Aggressive?
+#Sparr
+
+#######Sexual
+#Sex forplay
+#Drumming
+
+#######??????
+#Beg/Suckle (have to see what is the definition of the behaviour)
+
+
+#Behaviours that can be received
+View(Behaviour_State_List %>% 
+       group_by(Behaviour) %>% 
+       mutate(Count = n()) %>% 
+       filter(Count > 1))
+#Huddeling, Groom, Beg/Suckle, Drumming can be received and must be excluded from duration
+
+
+
+##########################################Disregard Modifiers
+
+#SummaryMod indicates that summary is made based on modifiers
+#Summary indicates that modifiers have been disregarded
+
+#Exclude state received
+#will be necessary to compute focal duration
+Focal_State_SummaryMod_Given <- qry_FocalStateSummary_All %>% 
+  filter(!(Behaviour %in% c("Huddeling","Groom","Beg/Suckle","Drumming") & 
+           ModifierValue1 == 1))#1 stands for received
+
+
+#generate a summary that disregard the modifiers 
+Focal_State_Summary_Given <- Focal_State_SummaryMod_Given %>% 
+  #GROUP BY FOCALREF 
+  group_by(FocalRef,DataSource, Behaviour) %>% 
+  mutate(Duration = sum(TotalDuration),
+         Count = sum(BehaviourCount)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  distinct(FocalRef,DataSource,BehaviourType,Behaviour,Count,Duration)
+View(Focal_State_Summary_Given)
+#90'333 without zero 
+
+
+##########################################Generate 0
+
+#Generate all combination of FocalRef and State Behaviours 
+#we will do so from FocalRef from sessions (keep in mind that there is a loss of session number if FocalRef is queried from FocalState summary). 
+#all sessions that have no state behaviours recorded (impossible normally vut roughly 300 sessions like that in our DB)
+FocalRef_StateBehaviour_Combination <- qry_FocalSession_All %>% 
+  distinct(FocalRef,DataSource) %>% 
+  expand_grid(.,Behaviour_State_List %>% 
+                distinct(Behaviour))
+View(FocalRef_StateBehaviour_Combination)
+#240'624 combination
+
+
+#Include zero in existing data 
+Focal_State_Summary0_Given <- FocalRef_StateBehaviour_Combination %>% 
+  left_join(.,Focal_State_Summary_Given) %>% 
+  replace_na(list(BehaviourType = "State", Duration = 0, Count = 0)) %>% 
+  inner_join(.,qry_FocalSession_All %>% 
+               select(FocalRef,DataSource,FocalDate) %>% 
+               rename(ObsDate = FocalDate)) %>% 
+  relocate(ObsDate,.after = FocalRef)
+View(Focal_State_Summary0_Given)
+#240'624
+
+View(Focal_State_Summary0_Given %>% 
+       distinct(FocalRef,DataSource))
+
+
+##########################################Exclude bad focals
+
+#Identify FocalRef that have no state behaviours 
+FocalRef_ToExclude <- Focal_State_Summary0_Given %>% 
+    #GROUP BY FOCALREF 
+  group_by(FocalRef,DataSource) %>% 
+  mutate(TotalState = sum(Duration)) %>% 
+  ungroup() %>% 
+  #UNGROUP
+  filter(TotalState == 0) %>% 
+  distinct(FocalRef,DataSource)
+View(FocalRef_ToExclude)
+#364 focal that have no state behaviours
+#They should be checked
+#only one of them with the new import
+
+
+
+#remove focals that have no state behaviour recorded
+#remove behaviours that are of no interest or have almost never been recorded
+#Thsi perhaps could be done after merging with points?
+Focal_State_Summary0_GivenII <- Focal_State_Summary0_Given %>% 
+  anti_join(.,FocalRef_ToExclude)#remove focalref that have no duration. Check whether they may have point behaviours
+View(Focal_State_Summary0_GivenII)
+#234'072
+
+View(Focal_State_Summary0_GivenII %>% 
+       distinct(FocalRef,DataSource))
+
+View(Focal_State_Summary0_GivenII %>% 
+       distinct(Behaviour))
+#Out of Sight is still included
+
+
+
+##########################################Focal Duration
+#get the duration Seen
+#Will be needed to calculate proportion and frequency
+
+Focal_DurationSeen <- Focal_State_Summary0_GivenII %>%
+  filter(Behaviour != "Out of sight") %>% 
+  #GROUP BY FOCAL REF, DATASOURCE
+  group_by(FocalRef,DataSource) %>% 
+  mutate(FocalDurationSeen = sum(Duration)) %>% 
+  ungroup() %>% 
+  #UNGROUP 
+  distinct(FocalRef,DataSource,FocalDurationSeen) %>% 
+  arrange(DataSource, FocalRef)
+View(FocalDuration)
+
+
+##########################################Proportion and Frequency 
+
+Focal_State_Summary0_GivenIII <- Focal_State_Summary0_GivenII %>% 
+  left_join(.,Focal_DurationSeen)
+View(Focal_State_Summary0_GivenIII)
+#234'072
+
+```
+
+
+```{r State Check}
+
+##########################################Modifiers Explor
+
+#State Behaviour that can be received
+View(Focal_Summary_All %>% 
+       filter(BehaviourType == "State",ModifierClass1 == "Received") %>% 
+       distinct(Behaviour,ModifierClass1,.keep_all = TRUE))
+#Among the 4 behaviours recorded, there are 4 that can be received
+#Received is always as ModifierClass 1
+#Huddeling
+#Groom
+#Beg/Suckle
+#Drumming
+#This is not really relevant with respect to the behaviours expressed by animals
+#Also some of the received may only have been recorded since some point in time and not from the start of the project
+
+
+#State behaviour that have animalID as a modifier 
+#AnimalID is only as a modifier 1 and 2
+View(Focal_Summary_All %>% 
+       filter(BehaviourType == "State",
+              ModifierClass1 == "AnimalID" |
+              ModifierClass2 == "AnimalID") %>% 
+       distinct(Behaviour,ModifierClass1,ModifierClass2))
+#I think it would be easier to have it all in the same column but would probably be quite a lot of work
+#Huddeling
+#Groom
+#Sparr
+#Beg/Suckle
+#Sex forplay
+#Drumming
+
+
+#In the old data the modifier AnimalID was taken into account to generate summary
+View(qry_FocalStateSummary_Mrdb %>% 
+        filter(Behaviour == "Sparr") %>% 
+       group_by(FocalRef) %>% 
+       mutate(Count = n()) %>% 
+       ungroup())
+
+
+#In the old data the modifier AnimalID was taken into account to generate summary
+View(qry_FocalStateSummary_Mrdb %>% 
+        filter(Behaviour == "Groom") %>% 
+       group_by(FocalRef) %>%
+       mutate(Count = n_distinct(ModifierValue1)) %>% 
+       ungroup())
+
+
+#Beg/Suckle
+View(qry_FocalStateSummary_All %>% 
+       filter(Behaviour == "Beg/Suckle"))
+#only 4 rows of behaviour
+#Could easily be excluded
+
+
+##########################################Duration Check 
+
+#Observation shorter than one minute
+View(FocalDuration %>% 
+       filter(FocalDuration < 60) %>% 
+       arrange(DataSource,FocalRef))
+#There are 107 focals that are less than a minute long. They seem to largely occur in sequence 
+#8111-8120 (all Attenborough), 8389-8416 (all attenborough), 8481-8502 (all G11),9150-9195 (all G11). Probably two or 4 different import
+#I suspect that the duration were computed in the wrong unit as the focal session in DB tells the duration was much longer. It is the summary that seems odd
+
+
+#Observation shorter than 5 minute
+View(FocalDuration %>% 
+       filter(FocalDuration < 300) %>% 
+       arrange(DataSource,FocalRef))
+#274 obs are shorter than 5min
+
+
+#Observation shorter than 20 minute
+View(FocalDuration %>% 
+       filter(FocalDuration < 1200) %>% 
+       arrange(DataSource,FocalRef))
+#5355/1300 obs are shorter than 20min that is much bigger than what I thought
+
+
+#Observation longer than 20 minutes
+View(FocalDuration %>% 
+       filter(FocalDuration > 1200) %>% 
+       arrange(DataSource,FocalRef))
+#7650/13000 obs are longer than 20min.
+#We have to make an effort into increasing this
+
+```
+
+
+## Point 
+```{r Point Data}
+
+#Focal point new
+qry_FocalPointSummary_All 
+names(qry_FocalPointSummary_All)
+
+#Focal point all
+qry_FocalPointSummary_MrRaw
+names(qry_FocalPointSummary_MrRaw)
+
+
+##########################################Summary data wrangling 
+
+
+
+
+```
+
+
+## Merge State-Point
+
+```{r }
+
+
+##########################################Raw (New)
+#that will be useful for social intercations where the order of interactions is relevant
+
+
+##########################################Summary
+names(Focal_Summary_All)
+
+Focal_Summary_All <- bind_rows(qry_FocalStateSummary_All,qry_FocalPointSummary_All) %>% 
+  left_join(.,Focal_DurationSeen) %>% 
+  mutate(Proportion_Time = TotalDuration/Focal_DurationSeen,
+         Frequency)
+
+
+##########################################Daily
+
+Focal_Summary_All <- bind_rows(qry_FocalStateSummary_All,qry_FocalPointSummary_All) %>% 
+  left_join(.,Focal_DurationSeen)
+
+```
+
+
+
+```{r State Point check}
+
+##########################################Behaviour recording
+
+names(qry_FocalStateSummary_All)
+names(Behaviour_State_List)
+
+poo <- qry_FocalStateSummary_All %>% 
+  filter(BehaviourType == "State") %>% 
+  distinct(FocalRef,DataSource) %>% 
+  expand_grid(.,Behaviour_State_List)
+View(poo)
+#There are only 13'006 sessions as opposed to 13'368 focal observations in the sessions part of the code
+
+
+```
+
+
+##Animal Info
+
+This part should ultimately be common for Focal and scan
+
+We need to get info on focal animals and his partners. Animal Info could be queried based on group composition (but then it that case that may cause issue for intrusions) or based on who was observed (however that will cause issue to get the group characteristics)
+
+The best way to do this is 
+
+1) Query info of all animals that were present in the focal group
+
+2) Query info on the focal animals that were not part of the group where the focal was done
+
+3) check info on partner that were not queried as being a member of that group
+
+I will start getting all information on Animals living in groups where the membership of the focal animal matched in Observer and MembershipV2
+
+```{r Animal Info}
+
+#######################################FocalDate 
+
+FocalList <- qry_FocalSession_All %>% 
+  distinct(FocalDate,AnimalID,FocalRef,.keep_all = TRUE) %>% 
+  select(AnimalID,Colony,FocalDate,DataSource,FocalRef,ExpName) %>% 
+  mutate(AnimalID = toupper(AnimalID))
+View(FocalList)
+#13'368 focals
+#7050 combination of AnimalID and FocalDate
+#7076 if one adds the name of the experiment (I suspect experiment name was forgotten for a few focals)
+
+
+#######################################Colony mismatch
+
+#Compare colony inputted in Observer and queried
+#Not that I have here assumed that animals were always part of the same group on a given day 
+Focal_ColonyComparison <- FocalList %>% 
+  rename(ObsDate = FocalDate,
+         ColonyObserver = Colony) %>% 
+  membership(Date = ObsDate)
+View(Focal_ColonyComparison)
+#13'454 comparison, more than the number of Focal sessions (13'368), suggesting some focals must have been performed on date change
+
+
+#Colony is similar
+Focal_ColonyMatch <- Focal_ColonyComparison %>% 
+  filter(ColonyObserver == Colony)
+View(Focal_ColonyMatch)
+#13'135 focal out 13'368 existing focals generate a matched colony
+  
+#ColonyMismatch
+Focal_ColonyMismatch <- Focal_ColonyComparison %>% 
+  filter(ColonyObserver != Colony)
+View(Focal_ColonyMismatch)
+#316 focal have a mismatch between colony entered in Observer and colony queried
+
+
+View(Focal_ColonyMismatch %>% 
+       filter(ExpName == "HBO2"))
+#212 are HBO2 which is normal
+#Thus there are 104 focal that seem to have a wrong colony recorded. This should be recorded at some point
+
+
+#######################################group composition
+
+#Queried group composition on days of focal for which colony entered in Observer matched the one queried from database 
+GroupComp_Focal <- groupcomp(Focal_ColonyMatch %>% 
+  distinct(Colony,ObsDate), Date = ObsDate) %>% 
+    distinct(ObsDate,Colony,AnimalID)
+View(Focal_GroupComp_Queried)
+
+View(Focal_GroupComp_Queried %>% 
+       filter(Colony == "Aristotle",
+              ObsDate == "2016-01-02"))
+#29494
+
+
+#remain to query info on focal that were not member of group
+#check if there are any partners that may not have been part of group (mistake or experiment?)
+
+
+#######################################Static info
+
+#fixed characteristics of individual 
+AnimalID_Static_Focal <- idinfo_static(GroupComp_Focal %>% 
+  distinct(AnimalID))
+View(AnimalID_Static_Focal)
+#959 animals were members of groups that were focalled 
+
+names(AnimalID_Static_Focal)
+
+
+#######################################Dynamic info
+
+#Get a list of dates of interest, AnimalID and static info 
+#Should have #29494
+AnimalID_Static_FocalDates<- GroupComp_Focal %>%
+  left_join(.,AnimalID_Static_Focal)
+View(AnimalID_Static_FocalDates)
+##29494 loss of zero row
+
+View(AnimalID_Static_FocalDates %>% 
+       filter(Colony == "Aristotle",
+              ObsDate == "2016-01-02"))
+
+
+#Individual Info
+#Age <- age_inmonths()
+#Breeding Status <- breedingstatus 
+#Gestation status <- gestationstatus(); function is not terminated to determine breeding status after last parturition
+#weight <- clsosestweight()
+AnimalID_Dynamic_Focal <- AnimalID_Static_FocalDates %>% 
+  age_inmonths(Date = ObsDate) %>% 
+  age_indays(Date = ObsDate) %>% 
+  breedingstatus(Date = ObsDate) %>% 
+  left_join(.,gestationstatus(DF = AnimalID_Static_FocalDates)) %>% 
+  left_join(.,closestweight(DF1 = AnimalID_Static_FocalDates %>% 
+                              select(AnimalID,ObsDate), DF2 = tblWeights, Date = ObsDate))
+names(AnimalID_Dynamic_Focal)
+
+```
+
+
+## Group Info 
+
+```{r Group Info}
+
+#Get info on group conposition
+#A current limitation is that all individuals who were wild caught are considered older than 18 months which is not going to be true for quite a lot of them.
+GroupCompInfo_Focal <- groupinfo(DF = AnimalID_Dynamic_Focal %>% 
+  select(ObsDate,Colony,AnimalID,Sex,Age_Months,Age_Days), Date = ObsDate, Age = Age_Days)
+View(GroupCompInfo_Focal)
+
+#Breeding status of group
+#is actually necessary to get the correct gestation status (see in function)
+
+
+#One thing that will surely be relevant is the size of the tunnel system. With Focal it should be easier to control for it whereas in scan I will need to dive onto the DB
+```
+
+
+##All Animal/Group Info
+
+All informations on animals that could be either focal animals or their partners
+```{r Info All}
+
+AllInfo_Focal <- AnimalID_Dynamic_Focal %>% 
+  left_join(.,GroupCompInfo_Focal) %>% 
+  mutate(Lactating = case_when(Sex == "F" & BreedingStatus ==  "Breeder" & Pup14 > 0 ~ "Lactating",
+                               Sex == "F" & BreedingStatus ==  "Breeder" & Pup14 == 0 ~ "NotLactating",
+                               TRUE ~ ""))
+View(AllInfo_Focal)
+
+unique(AllInfo_Focal$Lactating)
+
+```
+
+
+##Focal Animal Info
+
+```{r Focal Animal Info}
+names(Focal_ColonyMatch)
+names(FocalList)
+
+#Information on animals that were focaled and whose Membership matched the one recorded in Observer
+FocalAnimal_Info <- Focal_ColonyMatch %>% 
+  select(AnimalID,Colony,ObsDate,DataSource,FocalRef) %>% 
+  left_join(.,AllInfo_Focal)
+View(FocalAnimal_Info)
+
+View(FocalAnimal_Info %>% 
+       filter(is.na(Sex)))
+#seems that all focal ID are being assigned some information
+
+
+#Subset to Focal animals that had
+#i) state behaviour recorded
+Focal_FocalAnimal_Info_Subset <- Focal_State_Summary0_GivenIII %>% 
+  distinct(FocalRef,DataSource) %>% #Starts with focal that had state behaviour recorded
+  inner_join(.,FocalAnimal_Info)
+View(Focal_FocalAnimal_Info_Subset)
+#12'814 focals 
+#as a reinder there was 13'368 sessions, 13'004 with state behaviours recorded, and 13'135 that membership of focalID matched recorded group in Observer
+#one has certainl
+
+
+```
+
+
+##Partner Animal Info
+
+
+##Link AnimalInfo with Behaviour
+
+Keep in mind that 364/13'368 focals that have been assigned a session have had no state behaviours recorded
+
+```{r State}
+
+
+###############################################By Session
+
+#Join animal info with behaviours
+#I am not sure which name to give
+#think would be good to have stg in names that defines when dataset only contains behaviour or also behaviour and animalinfo
+Focal_State_FocalBehaviour_BySession <- Focal_FocalAnimal_Info_Subset %>% 
+  left_join(.,Focal_State_Summary0_GivenIII)
+View(Focal_State_FocalBehaviour_BySession)
+View(Focal_State_FocalBehaviour_BySession %>% 
+       distinct(FocalRef,DataSource))
+
+View(Focal_State_FocalBehaviour_BySession)
+
+
+###############################################By Day of observation 
+#One assumes that AnimalID and group characteristics don't change within a day 
+
+#get observation duration per day
+Focal_DurationSeen_Day <- Focal_State_FocalBehaviour_BySession %>%
+  distinct(DataSource,ObsDate,AnimalID,FocalRef,FocalDurationSeen) %>% 
+  #GROUP BY OBSDATE, ANIMALID
+  group_by(DataSource,ObsDate,AnimalID) %>% 
+  summarize(FocalDurationSeen_Day = sum(FocalDurationSeen)) %>% 
+  ungroup()
+  #UNGROUP
+View(Focal_DurationSeen_Day)
+#6682 combination of days and AnimalID observation
+
+
+#summary of daily duration
+summary(Focal_DurationSeen_Day$FocalDurationSeen_Day)
+
+
+#Generate count and duration per day and join with daily duration of observation
+StateBehaviour_ByDay <- Focal_State_FocalBehaviour_BySession %>% 
+  #GROUP BY OBSDATE, ANIMALID
+  group_by(DataSource,ObsDate,AnimalID,Behaviour) %>% 
+  summarize(Count_Day = sum(Count),
+         Duration_Day = sum(Duration)) %>% 
+  ungroup()
+  #UNGROUP
+View(StateBehaviour_ByDay)
+
+View(FocalBehaviour_ByDay %>% 
+       distinct(DataSource,ObsDate,AnimalID))
+#6682 combinations all good same as before
+
+
+#Join AnimalInfo, Daily Behaviour and Count and TotalDaily Duration
+State_AnimalInfo_Behaviour_ByDay <- Focal_FocalAnimal_Info_Subset %>% #_Subset refers to obs that had a state duration recorded
+  select(-FocalRef) %>% 
+  distinct() %>% 
+  left_join(.,StateBehaviour_ByDay) %>% 
+  left_join(Focal_DurationSeen_Day) %>% 
+  mutate(Proportion_Time = Duration_Day/FocalDurationSeen_Day,
+         Frequency_Hour = Count_Day/(FocalDurationSeen_Day/3600))
+View(State_AnimalInfo_Behaviour_ByDay)
+
+View(State_AnimalInfo_Behaviour_ByDay %>% 
+       distinct(DataSource,ObsDate,AnimalID))
+#6682 combination of days and animal observation
+  
+
+  
+###############################################By Day and subsetting for LHAM 
+#exlude males
+#exclude animals younger than 12 months old
+#exclude observation that may be too short? less than 20 minutes/day
+#generate Female category. This can be moved way earlier in the code
+
+LHAM_FocalSelection <- State_AnimalInfo_Behaviour_ByDay %>% 
+  distinct(DataSource,ObsDate,AnimalID,.keep_all = TRUE) %>% 
+  filter(Sex == "F",
+         Age_Months > 12 | is.na(Age_Months),
+         FocalDurationSeen_Day > 1200,
+         is.na(GestationStatus) | GestationStatus != "PostLastParturition") %>% 
+  #GENERATE FEMALE CATEGORY
+  mutate(FemaleCategory = case_when(BreedingStatus == "Helper" ~ "Helper",
+                                    BreedingStatus == "Breeder" & Lactating == "NotLactating" & GestationStatus %in% c("Conception","NotPregnant") ~ "NotPreg",
+                                    BreedingStatus == "Breeder" & Lactating == "NotLactating" & GestationStatus %in% c("FirstTrimester","SecondTrimester") ~ "EarlyGest",
+                                    BreedingStatus == "Breeder" & Lactating == "NotLactating" & GestationStatus %in% c("ThirdTrimester") ~ "LateGest",
+         BreedingStatus == "Breeder" & Lactating == "Lactating" ~ "Lact"))
+         
+View(LHAM_FocalSelection)
+#3662 obs after removal of male
+#1954 obs after removal of animal younger than 12 months
+#1547 Obs after excluding observation shorter than 20 minutes
+#1518 Obs if one exclude the PostLastParturition sample
+  
+
+
+###############################################Data check in the creation of female category
+
+#Female that are First trimester and lactating 
+View(LHAM_FocalSelection %>%
+       filter(GestationStatus == "Conception",
+              Lactating == "Lactating"))
+#14 entries
+
+
+#Female that are First trimester and lactating 
+View(LHAM_FocalSelection %>%
+       filter(GestationStatus == "FirstTrimester",
+              Lactating == "Lactating"))
+#None and that is a bit strange to me
+#I put conception 89 days before parturition
+
+
+#Female that are Second trimester and lactating 
+View(LHAM_FocalSelection %>%
+       filter(GestationStatus == "SecondTrimester",
+              Lactating == "Lactating"))
+#None 
+
+
+#Female that are third trimester and lactating 
+View(LHAM_FocalSelection %>%
+       filter(GestationStatus == "ThirdTrimester",
+              Lactating == "Lactating"))
+#None 
+
+
+#Female that are helper and have a pregnancy status
+View(LHAM_FocalSelection %>%
+       filter(BreedingStatus == "Helper",
+              !(is.na(GestationStatus) | Lactating == "Lactating")))
+#seems ok
+#no helper is lactating 
+#No helper is later than conception except one
+
+
+#Female that are helper and have a pregnancy status
+View(LHAM_FocalSelection %>%
+       filter(BreedingStatus == "Breeder",
+              is.na(Lactating)))
+#seems ok
+
+
+###############################################Sample size and data description
+
+#Count of AnimalID per category
+#Count of number of focal days per category
+LHAM_FocalState_SampleSize <- LHAM_FocalSelection %>%
+  #GROUP BY ANIMALID, FEMALE CATEGORY
+  group_by(FemaleCategory) %>% 
+  mutate(AnimalCount = n_distinct(AnimalID)) %>%
+  mutate(ObsDayCount = n()) %>%
+  ungroup() %>% 
+  #UNGROUP 
+  select(FemaleCategory,AnimalCount,ObsDayCount) %>% 
+  distinct()
+View(LHAM_FocalState_SampleSize)
+
+
+#Duration of observation 
+ObsDuration <- LHAM_FocalSelection %>% 
+  select(FemaleCategory,LHAM_FocalSelection)
+
+
+ObsDuration_Plot <- ggplot(LHAM_FocalSelection, aes(x=FemaleCategory, y=FocalDurationSeen_Day/60)) + 
+  geom_violin()
+
+
+  
+
+
+
+
+```
+
+
+
+```{r check gestation and lactation}
+View(AllInfo_Focal)
+
+#There is an issue with assignement of gestation status or lactating because I cannot have female that are lactating in the third trimester
+View(LHAM_FocalSelection %>% 
+       filter(is.na(FemaleCategory)) %>% 
+       select(AnimalID,BreedingStatus,GestationStatus,Lactating) %>% 
+       arrange(GestationStatus))
+
+
+
+ToCheck <- FocalAnimal_Info %>% 
+  filter(Sex == "F") %>% 
+  select(Colony,AnimalID,ObsDate,FirstConceptionDate,BreedingStatus,NextParturitionDate,NextLitterRef,NextParturitionCollection_DayDiff,GestationStatus,Pup14_Presence,Lactating) %>% 
+  arrange(Colony,AnimalID,ObsDate)
+
+View(ToCheck)
+#7616 focals done on female
+
+
+
+
+View(Litter_Info %>% 
+       filter(AnimalID == "L7F007"))
+#suggest there is stg wrong with pup presence
+
+
+```
+
+
+

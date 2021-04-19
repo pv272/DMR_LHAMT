@@ -1,0 +1,31 @@
+"CodeRef","Label","Value","BehaviourRaw","ReceivedValue"
+"FocalPointBehav","Back Sparr",1,"RBack spar",0
+"FocalPointBehav","Back Sparr",1,"Back Sparr",1
+"FocalPointBehav","Begging Call",3,"RBegging Call",0
+"FocalPointBehav","Begging Call",3,"Begging Call",1
+"FocalPointBehav","Bite",4,"RBite",0
+"FocalPointBehav","Bite",4,"Bite",1
+"FocalPointBehav","Carry pup",7,"Carry pup",NA
+"FocalPointBehav","Chase",8,"RChase",0
+"FocalPointBehav","Chase",8,"Chase",1
+"FocalPointBehav","Copulation",9,"RCopulation",0
+"FocalPointBehav","Copulation",9,"Copulation",1
+"FocalPointBehav","Displace",11,"RDisplace",0
+"FocalPointBehav","Displace",11,"Displace",1
+"FocalPointBehav","DropFS",12,"DropFS",NA
+"FocalPointBehav","Groom call",16,"Groom call",NA
+"FocalPointBehav","Pass",22,"Pass",NA
+"FocalPointBehav","Pull tail",23,"RPull tail",0
+"FocalPointBehav","Pull tail",23,"Pull tail",1
+"FocalPointBehav","Pump",24,"Pump",NA
+"FocalPointBehav","Retreat",26,"RRetreat",0
+"FocalPointBehav","Retreat",26,"Retreat",1
+"FocalPointBehav","Sniff",29,"Sniff",1
+"FocalPointBehav","Sniff",29,"RSniff",0
+"FocalPointBehav","Submiss call",31,"Submiss call",1
+"FocalPointBehav","Submiss call",31,"RSubmiss call",0
+"FocalPointBehav","Unknown call",33,"Unknown call",1
+"FocalPointBehav","Unknown call",33,"RUnknown Call",0
+"FocalPointBehav","Overt aggression",34,"Overt aggression",1
+"FocalPointBehav","Overt aggression",34,"ROvertAgg",0
+"FocalPointBehav","Overt aggression",34,"OvertAgg",1
